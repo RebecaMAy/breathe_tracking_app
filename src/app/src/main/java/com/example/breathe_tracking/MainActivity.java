@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
                     if (scanResult != null && scanResult.getContents() != null) {
                         String codigoQR = scanResult.getContents();
 
-                        // ⭐ ACCIÓN PRINCIPAL: PEGAR EL CÓDIGO EN EL CAMPO ⭐
+                        //PEGAR EL CÓDIGO EN EL CAMPO
                         sensorCodeEditText.setText(codigoQR);
 
                         Toast.makeText(this, "Código de sesión pegado", Toast.LENGTH_SHORT).show();
@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
-        
+
 
         // Definimos el comportamiento del boton de login
         loginButton.setOnClickListener(v -> {
@@ -136,7 +136,6 @@ public class MainActivity extends AppCompatActivity {
         integrator.setBeepEnabled(false);
         integrator.setBarcodeImageEnabled(true);
 
-        // Obtener el Intent de la librería ZXing
         Intent scanIntent = integrator.createScanIntent();
 
         // Iniciar el escaneo usando el lanzador que configuramos para manejar el resultado
