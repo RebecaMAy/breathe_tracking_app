@@ -13,8 +13,10 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -62,6 +64,9 @@ public class MainActivity extends AppCompatActivity {
         EditText sensorCodeEditText = findViewById(R.id.editText_codigo);
         Button loginButton = findViewById(R.id.button_entrar);
         TextView qrCodeTextView = findViewById(R.id.textView_codigoQR);
+
+        // Llamada a acceso biométrico
+        mostrarAutenticacionBiometrica();
 
         //Inicializamos el manejador de resultados del QR
         qrScannerLauncher = registerForActivityResult(
@@ -125,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    // --- Fin Método Principal (onCreate) ------------------------------------------------------------------------------------------
+    // --- Fin Metodo Principal (onCreate) ------------------------------------------------------------------------------------------
 
     // --- Intent para abrir la camara ------------------------------------------------------------------------------------
     private void openCamera() {
@@ -143,4 +148,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
+
+
+    // --- Metodo para acceso biométrico --------------------------------------------------------------------------
+    private void mostrarAutenticacionBiometrica() {
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Acceso Biométrico")
+                .setSubtitle("Usa tu huella dactilar o rostro para iniciar sesión")
+                .setNegativeButtonText("Usar código de sensor") // Opción para volver al login normal
+                .setConfirmationRequired(true)
+                .build();
+
+        BiometricPrompt biometricPrompt = new BiometricPrompt(
+                MainActivity.this,
+                ContextCompat.getMainExecutor(this),
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        // ⭐ ÉXITO: Acceso concedido
+                        iniciarSesionExitosa("BIOMETRIC_CODE");
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        // Error (ej. cancelado por el usuario)
+                        Toast.makeText(MainActivity.this, "Error de autenticación: " + errString, Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+        biometricPrompt.authenticate(promptInfo);
+    }
+
+    private void iniciarSesionExitosa(String code) {
+        Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
+        intent.putExtra("SENSOR_CODE", code);
+        startActivity(intent);
+        finish();
+    }
+
+    // --- Fin Metodo para acceso biométrico ----------------------------------------------------------------------
+
 }
