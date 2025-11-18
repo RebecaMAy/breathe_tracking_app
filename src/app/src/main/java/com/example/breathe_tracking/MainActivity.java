@@ -19,15 +19,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
 /**
  * CLASE MAIN ACTIVITY - LOG IN
- * - Logica fake log in
- * - Fake lector QR
+ * - Logica fake log in (30/10/25 - Sandra)
+ * - Lector QR (16/11/25 - Rocio)
+ * - Acceso biometrico (17/11/25 - Rocio)
  */
 
 
@@ -46,10 +45,10 @@ public class MainActivity extends AppCompatActivity {
             });
     // --- Fin Lanzador de Permisos ---------------------------------------------------------------------------------------
 
+
     //----- Lanzador de la camara -----------------------------------------------------------------------------------------
     private ActivityResultLauncher<Intent> qrScannerLauncher;
     //----- Fin Lanzador de la camara -------------------------------------------------------------------------------------
-
 
 
     // --- Metodo Principal (onCreate) ----------------------------------------------------------------
@@ -94,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
         loginButton.setOnClickListener(v -> {
             String sensorCode = sensorCodeEditText.getText().toString();
 
-            // Comprobamos que el campo no esté vacío y que el código sea correcto (12345)
+            // Comprobamos que el campo no esté vacío y que el codigo sea correcto (12345)
             if (sensorCode.isEmpty()) {
                 // Si el campo está vacío, mostramos un mensaje de error
                 new AlertDialog.Builder(MainActivity.this)
@@ -107,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
                 intent.putExtra("SENSOR_CODE", sensorCode);
                 startActivity(intent);
-                finish(); // <--  cerramos la actividad de login para que no pueda volver a ella
+                finish(); // Cerramos la actividad de login si es correcto
             } else {
                 // Si el código es incorrecto, mostramos un mensaje de error
                 new AlertDialog.Builder(MainActivity.this)
@@ -118,9 +117,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Comportamiento del botón de QR que por el momento es abrir la camara para una simulación
+        //Texto que abre la camara QR
         qrCodeTextView.setOnClickListener(v -> {
-            // Comprobamos si hay permiso para abrir la camara si no lo tenemos, lo pedimos
+            //Comprobamos si hay permiso para abrir la camara. Si no lo tenemos, lo pedimos!!
             if (ContextCompat.checkSelfPermission(
                     this, Manifest.permission.CAMERA) ==
                     PackageManager.PERMISSION_GRANTED) {
@@ -131,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     // --- Fin Metodo Principal (onCreate) ------------------------------------------------------------------------------------------
+
 
     // --- Intent para abrir la camara ------------------------------------------------------------------------------------
     private void openCamera() {
@@ -143,10 +143,9 @@ public class MainActivity extends AppCompatActivity {
 
         Intent scanIntent = integrator.createScanIntent();
 
-        // Iniciar el escaneo usando el lanzador que configuramos para manejar el resultado
+        //Iniciar el escaneo usando el lanzador que configuramos para manejar el resultado
         qrScannerLauncher.launch(scanIntent);
     }
-
     // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
 
 
@@ -166,14 +165,14 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                         super.onAuthenticationSucceeded(result);
-                        // ⭐ ÉXITO: Acceso concedido
+                        // Acceso concedido
                         iniciarSesionExitosa("BIOMETRIC_CODE");
                     }
 
                     @Override
                     public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                         super.onAuthenticationError(errorCode, errString);
-                        // Error (ej. cancelado por el usuario)
+                        // Error
                         Toast.makeText(MainActivity.this, "Error de autenticación: " + errString, Toast.LENGTH_SHORT).show();
                     }
                 });
