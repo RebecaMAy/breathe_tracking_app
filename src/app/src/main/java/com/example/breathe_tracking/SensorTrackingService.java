@@ -143,6 +143,19 @@ public class SensorTrackingService extends Service {
             dataHolder.incidenciaData.postValue(message);
             //Envia notificacion sobre la alerta
             sendAlertNotification("Alerta de Conexión", "El sensor no está funcionando correctamente", CONNECTION_ALERT_ID);
+
+            // Logica de firestor para actualizacion del estado del sensor
+            // Creamos un Mapa con solo los campos que queremos modificar: estado y timestamp.
+            Map<String, Object> desconexionData = new HashMap<>();
+            desconexionData.put("estado", "Desconectado");
+            desconexionData.put("ultima_conexion", FieldValue.serverTimestamp());
+
+            // Usamos SET con MERGE: Esto garantiza que los campos de medición no se borren
+            sensorDocRef.set(desconexionData, SetOptions.merge())
+                    .addOnSuccessListener(aVoid -> Log.d(ETIQUETA_LOG, "Estado de Desconexión subido a Firestore."))
+                    .addOnFailureListener(e -> Log.e(ETIQUETA_LOG, "Fallo al subir estado de desconexión: " + e.getMessage()));
+
+
         };
     }
     // --- Fin onCreate ----------------------------------------------------------------------------------
