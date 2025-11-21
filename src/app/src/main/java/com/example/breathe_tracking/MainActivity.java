@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -13,9 +14,15 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
+
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
+import com.google.firebase.FirebaseApp;
 
 /**
  * Nombre: Sandra Moll Cots
@@ -26,6 +33,9 @@ import androidx.core.content.ContextCompat;
  *
  * Copyrigth © 2025
  * Fecha, autor, aportacion: Sandra Moll Cots, Permisos bluetooh, ubicacion y  comportamiento login
+ * - Logica fake log in (30/10/25 - Sandra)
+ * - Lector QR (16/11/25 - Rocio)
+ * - Acceso biometrico (17/11/25 - Rocio)
  */
 
 
@@ -45,8 +55,12 @@ public class MainActivity extends AppCompatActivity {
     // --- Fin Lanzador de Permisos ---------------------------------------------------------------------------------------
 
 
+    //----- Lanzador de la camara -----------------------------------------------------------------------------------------
+    private ActivityResultLauncher<Intent> qrScannerLauncher;
+    //----- Fin Lanzador de la camara -------------------------------------------------------------------------------------
 
-    // --- Método Principal (onCreate) ----------------------------------------------------------------
+
+    // --- Metodo Principal (onCreate) ----------------------------------------------------------------
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,11 +73,36 @@ public class MainActivity extends AppCompatActivity {
         Button loginButton = findViewById(R.id.button_entrar);
         TextView qrCodeTextView = findViewById(R.id.textView_codigoQR);
 
+        // Llamada a acceso biométrico
+        mostrarAutenticacionBiometrica();
+
+        //Inicializamos el manejador de resultados del QR
+        qrScannerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    // Manejador del resultado de la actividad QR
+                    IntentResult scanResult = IntentIntegrator.parseActivityResult(result.getResultCode(), result.getData());
+
+                    if (scanResult != null && scanResult.getContents() != null) {
+                        String codigoQR = scanResult.getContents();
+
+                        //PEGAR EL CÓDIGO EN EL CAMPO
+                        sensorCodeEditText.setText(codigoQR);
+
+                        Toast.makeText(this, "Código de sesión pegado", Toast.LENGTH_SHORT).show();
+
+                    } else if (result.getResultCode() == RESULT_CANCELED) {
+                        Toast.makeText(this, "Escaneo cancelado", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+
+
         // Definimos el comportamiento del boton de login
         loginButton.setOnClickListener(v -> {
             String sensorCode = sensorCodeEditText.getText().toString();
 
-            // Comprobamos que el campo no esté vacío y que el código sea correcto (12345)
+            // Comprobamos que el campo no esté vacío y que el codigo sea correcto (12345)
             if (sensorCode.isEmpty()) {
                 // Si el campo está vacío, mostramos un mensaje de error
                 new AlertDialog.Builder(MainActivity.this)
@@ -76,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
                 intent.putExtra("SENSOR_CODE", sensorCode);
                 startActivity(intent);
-                finish(); // <--  cerramos la actividad de login para que no pueda volver a ella
+                finish(); // Cerramos la actividad de login si es correcto
             } else {
                 // Si el código es incorrecto, mostramos un mensaje de error
                 new AlertDialog.Builder(MainActivity.this)
@@ -87,9 +126,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Comportamiento del botón de QR que por el momento es abrir la camara para una simulación
+        //Texto que abre la camara QR
         qrCodeTextView.setOnClickListener(v -> {
-            // Comprobamos si hay permiso para abrir la camara si no lo tenemos, lo pedimos
+            //Comprobamos si hay permiso para abrir la camara. Si no lo tenemos, lo pedimos!!
             if (ContextCompat.checkSelfPermission(
                     this, Manifest.permission.CAMERA) ==
                     PackageManager.PERMISSION_GRANTED) {
@@ -99,14 +138,64 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    // --- Fin Método Principal (onCreate) ------------------------------------------------------------------------------------------
+    // --- Fin Metodo Principal (onCreate) ------------------------------------------------------------------------------------------
+
 
     // --- Intent para abrir la camara ------------------------------------------------------------------------------------
     private void openCamera() {
-        // Esto abre la app de la cámara. Para escanear QR, necesitarás una librería.
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        startActivity(intent);
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
+        integrator.setPrompt("Escanea el Código de Sesión");
+        integrator.setCameraId(0);
+        integrator.setBeepEnabled(false);
+        integrator.setBarcodeImageEnabled(true);
+
+        Intent scanIntent = integrator.createScanIntent();
+
+        //Iniciar el escaneo usando el lanzador que configuramos para manejar el resultado
+        qrScannerLauncher.launch(scanIntent);
+    }
+    // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
+
+
+    // --- Metodo para acceso biométrico --------------------------------------------------------------------------
+    private void mostrarAutenticacionBiometrica() {
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Acceso Biométrico")
+                .setSubtitle("Usa tu huella dactilar o rostro para iniciar sesión")
+                .setNegativeButtonText("Usar código de sensor") // Opción para volver al login normal
+                .setConfirmationRequired(true)
+                .build();
+
+        BiometricPrompt biometricPrompt = new BiometricPrompt(
+                MainActivity.this,
+                ContextCompat.getMainExecutor(this),
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        // Acceso concedido
+                        iniciarSesionExitosa("BIOMETRIC_CODE");
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        // Error
+                        Toast.makeText(MainActivity.this, "Error de autenticación: " + errString, Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+        biometricPrompt.authenticate(promptInfo);
     }
 
-    // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
+    private void iniciarSesionExitosa(String code) {
+        Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
+        intent.putExtra("SENSOR_CODE", code);
+        startActivity(intent);
+        finish();
+    }
+
+    // --- Fin Metodo para acceso biométrico ----------------------------------------------------------------------
+
 }
