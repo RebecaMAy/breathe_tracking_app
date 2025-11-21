@@ -25,7 +25,14 @@ import com.google.zxing.integration.android.IntentResult;
 import com.google.firebase.FirebaseApp;
 
 /**
+ * Nombre: Sandra Moll Cots
+ *
  * CLASE MAIN ACTIVITY - LOG IN
+ * - Logica fake log in
+ * - Lector QR
+ *
+ * Copyrigth © 2025
+ * Fecha, autor, aportacion: Sandra Moll Cots, Permisos bluetooh, ubicacion y  comportamiento login
  * - Logica fake log in (30/10/25 - Sandra)
  * - Lector QR (16/11/25 - Rocio)
  * - Acceso biometrico (17/11/25 - Rocio)
