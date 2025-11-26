@@ -91,7 +91,7 @@ public class SensorTrackingService extends Service {
     // Vigilante de Conexión
     private Handler watchdogHandler = new Handler(Looper.getMainLooper()); // Handler para programar tareas
     private Runnable watchdogRunnable; // La tarea (Runnable) que se ejecutará si se pierde la conexión
-    private static final long WATCHDOG_DELAY_MS = 3 * 60 * 1000; // 3 minutos
+    private static final long WATCHDOG_DELAY_MS = 1 * 60 * 1000; // 3 minutos
 
     // Memoria para los últimos valores que hemos recibido para evitar actualizaciones innecesarias si no ha cambiado el valor
     private float lastUpdatedTemp = -999.0f;

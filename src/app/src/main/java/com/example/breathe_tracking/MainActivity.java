@@ -200,11 +200,11 @@ public class MainActivity extends AppCompatActivity {
     // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
 
 
-    // --- Metodo para acceso biométrico --------------------------------------------------------------------------
+    // --- Metodos para acceso biométrico --------------------------------------------------------------------------
     private void mostrarAutenticacionBiometrica() {
         BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Acceso Biométrico")
-                .setSubtitle("Usa tu huella dactilar o rostro para iniciar sesión")
+                .setSubtitle("Usa tu huella dactilar para iniciar sesión")
                 .setNegativeButtonText("Usar código de sensor") // Opción para volver al login normal
                 .setConfirmationRequired(true)
                 .build();
@@ -245,22 +245,19 @@ public class MainActivity extends AppCompatActivity {
     // Dentro de MainActivity.java
 
     private void iniciarSesionExitosa(String code) {
+        // Esta acción se realiza siempre, sobreescribiendo el ID con el mismo ID, lo cual es seguro.
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        prefs.edit().putString("LAST_SENSOR_ID", code).apply();
+        Log.d("BIOMETRIA", "ID de sensor guardado/actualizado: " + code);
 
-        // 1. Lógica de Guardado (SOLO si no es la propia biometría la que lo está llamando)
-        if (!"BIOMETRIC_CODE".equals(code)) {
-            SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
-            prefs.edit().putString("LAST_SENSOR_ID", code).apply();
-            Log.d("BIOMETRIA", "ID de sensor guardado para uso futuro: " + code);
-        }
-
-        // 2. Inicio de actividad (Se mantiene igual)
+        // Inicio de actividad
         Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
         intent.putExtra("SENSOR_CODE", code);
         startActivity(intent);
         finish();
     }
 
-    // --- Fin Metodo para acceso biométrico ----------------------------------------------------------------------
+    // --- Fin Metodos para acceso biométrico ----------------------------------------------------------------------
 
     // --- Inicio Metodo para comprobación firebase ----------------------------------------------------------------------
 

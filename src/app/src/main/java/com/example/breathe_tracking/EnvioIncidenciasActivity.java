@@ -7,7 +7,12 @@ import android.widget.EditText;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class EnvioIncidenciasActivity extends AppCompatActivity {
 
@@ -51,26 +56,37 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
             String tituloIncidencia = tituloEditText.getText().toString();
             String mensajeIncidencia = mensajeEditText.getText().toString();
 
-            // --- FUTURA IMPLEMENTACIÓN DE FIREBASE ---
-            // Aquí es donde añadirías el código para enviar los datos a Firebase.
-            // Ejemplo:
-            // FirebaseFirestore db = FirebaseFirestore.getInstance();
-            // Map<String, Object> incidencia = new HashMap<>();
-            // incidencia.put("titulo", tituloIncidencia);
-            // incidencia.put("mensaje", mensajeIncidencia);
-            // incidencia.put("timestamp", new Date());
-            // db.collection("incidencias").add(incidencia);
+            // ------ Implemetnacion Firebase ---------------------------
+            FirebaseFirestore db = FirebaseFirestore.getInstance();
+            Map<String, Object> incidencia = new HashMap<>();
+            incidencia.put("sensor_id", sensorName);           // Codigo de sensor
+            incidencia.put("titulo", tituloIncidencia);
+            incidencia.put("mensaje", mensajeIncidencia);        // Contenido manual del usuario
+            incidencia.put("ubicacion", ubicacion);
+            incidencia.put("estado", "PENDIENTE");
+            incidencia.put("resuelta", false);
+            incidencia.put("fecha", FieldValue.serverTimestamp());
             // ------------------------------------------
 
-            // Mostrar pop-up de confirmación
-            new AlertDialog.Builder(this)
-                    .setTitle("Enviado")
-                    .setMessage("Mensaje enviado correctamente al administrador")
-                    .setPositiveButton("Aceptar", (dialog, which) -> {
-                        // Al pulsar aceptar en el pop-up, se cierra la pantalla de incidencias.
-                        finish();
+            db.collection("incidencias").add(incidencia)
+                    .addOnSuccessListener(documentReference -> {
+                        // ... (Manejo del éxito)
+                        new AlertDialog.Builder(this)
+                                .setTitle("Enviado")
+                                .setMessage("Mensaje enviado correctamente al administrador")
+                                .setPositiveButton("Aceptar", (dialog, which) -> {
+                                    finish();
+                                })
+                                .show();
                     })
-                    .show();
+                    .addOnFailureListener(e -> {
+                        // ... (Manejo del fallo)
+                        new AlertDialog.Builder(this)
+                                .setTitle("Error de Envío")
+                                .setMessage("No se pudo enviar la incidencia. Compruebe su conexión a Internet. Error: " + e.getMessage())
+                                .setPositiveButton("Aceptar", null)
+                                .show();
+                    });
         });
     }
 }
