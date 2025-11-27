@@ -1,3 +1,9 @@
+/**
+ * @file MainActivity.java
+ * @brief Actividad principal responsable del inicio de sesión (Login), escaneo de código QR y acceso biométrico.
+ * @package com.example.breathe_tracking
+ */
+
 package com.example.breathe_tracking;
 
 import android.Manifest;
@@ -53,18 +59,34 @@ import com.google.android.gms.tasks.OnCompleteListener;
  */
 
 
+/**
+ * @class MainActivity
+ * @brief Clase que gestiona la pantalla de inicio de sesión de la aplicación.
+ *
+ * Responsabilidades:
+ * 1. **Verificación de Sensor:** Comprueba la validez de un código de sensor en **Firebase Firestore**.
+ * 2. **Lector QR:** Permite escanear códigos QR para obtener el ID del sensor.
+ * 3. **Autenticación Biométrica:** Ofrece acceso rápido si existe un ID de sensor previamente guardado.
+ * 4. **Persistencia:** Guarda el último ID de sensor utilizado mediante SharedPreferences.
+ *
+ * @extends AppCompatActivity
+ */
 public class MainActivity extends AppCompatActivity {
 
-    // EditText para el código del sensor
+    /** @brief Campo de texto para ingresar manualmente el código del sensor. */
     private EditText sensorCodeEditText;
 
-    // Referencia a la base de datos de Firebase
+    /** @brief Instancia de Firebase Firestore para la verificación del código. */
     private FirebaseFirestore db;
 
 
 
     // --- Definición del Lanzador de Permisos ----------------------------------------------------------------------------
     // Permisos para abrir la camara (si acepta llama al metodo para abrir la camara, si no se muestra un toast)
+    /**
+     * @brief Launcher para solicitar el permiso de cámara necesario para el escáner QR.
+     * Si el permiso es concedido, llama a \ref openCamera().
+     */
     private final ActivityResultLauncher<String> requestPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(),
             isGranted -> {
@@ -78,12 +100,16 @@ public class MainActivity extends AppCompatActivity {
 
 
     //----- Lanzador de la camara -----------------------------------------------------------------------------------------
+    /** @brief Launcher para iniciar la actividad del escáner QR y manejar su resultado. */
     private ActivityResultLauncher<Intent> qrScannerLauncher;
     //----- Fin Lanzador de la camara -------------------------------------------------------------------------------------
 
 
     // --- Metodo Principal (onCreate) ----------------------------------------------------------------
-
+    /**
+     * @brief Método llamado al crear la actividad.
+     * @param savedInstanceState Si la actividad se está recreando, este Bundle contiene los datos de estado.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -101,6 +127,10 @@ public class MainActivity extends AppCompatActivity {
         // Llamada a acceso biométrico
         mostrarAutenticacionBiometrica();
 
+        /**
+         * @brief Inicializamos el manejador de resultados del QR.
+         * Procesa el resultado del escaneo, pegando el contenido en el campo del código del sensor.
+         */
         //Inicializamos el manejador de resultados del QR
         qrScannerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -123,35 +153,10 @@ public class MainActivity extends AppCompatActivity {
         );
 
 
-        /* Definimos el comportamiento del boton de login
-        loginButton.setOnClickListener(v -> {
-            String sensorCode = sensorCodeEditText.getText().toString();
-
-            // Comprobamos que el campo no esté vacío y que el codigo sea correcto (12345)
-            if (sensorCode.isEmpty()) {
-                // Si el campo está vacío, mostramos un mensaje de error
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Error, campo vacío")
-                        .setMessage("Añade el código del sensor para vincular.")
-                        .setPositiveButton("Aceptar", null)
-                        .show();
-            } else if ("12345".equals(sensorCode)) {
-                // Si el código es correcto, pasamos a la siguiente actividad
-                Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
-                intent.putExtra("SENSOR_CODE", sensorCode);
-                startActivity(intent);
-                finish(); // Cerramos la actividad de login si es correcto
-            } else {
-                // Si el código es incorrecto, mostramos un mensaje de error
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Error")
-                        .setMessage("El código de vinculación es incorrecto.")
-                        .setPositiveButton("Aceptar", null)
-                        .show();
-            }
-        });*/
-
-        // Definimos el comportamiento del boton de login
+        /**
+         * @brief Listener para el botón de login.
+         * Recoge el código, verifica que no esté vacío y llama a \ref checkSensorCodeInDatabase().
+         */
         loginButton.setOnClickListener(v -> {
             String sensorCode = sensorCodeEditText.getText().toString().trim();
 
@@ -169,7 +174,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        //Texto que abre la camara QR
+        /**
+         * @brief Listener para el texto del QR.
+         * Comprueba el permiso de cámara y, si es necesario, lo solicita antes de abrir la cámara.
+         */
         qrCodeTextView.setOnClickListener(v -> {
             //Comprobamos si hay permiso para abrir la camara. Si no lo tenemos, lo pedimos!!
             if (ContextCompat.checkSelfPermission(
@@ -185,6 +193,9 @@ public class MainActivity extends AppCompatActivity {
 
 
     // --- Intent para abrir la camara ------------------------------------------------------------------------------------
+    /**
+     * @brief Inicializa y lanza la actividad del escáner QR.
+     */
     private void openCamera() {
         IntentIntegrator integrator = new IntentIntegrator(this);
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
@@ -201,11 +212,15 @@ public class MainActivity extends AppCompatActivity {
     // --- Fin Intent para abrir la camara ------------------------------------------------------------------------------
 
 
-    // --- Metodo para acceso biométrico --------------------------------------------------------------------------
+    // --- Metodos para acceso biométrico --------------------------------------------------------------------------
+    /**
+     * @brief Muestra el diálogo de autenticación biométrica (huella dactilar).
+     * Si la autenticación es exitosa, intenta recuperar el último ID de sensor guardado para iniciar la sesión rápida.
+     */
     private void mostrarAutenticacionBiometrica() {
         BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Acceso Biométrico")
-                .setSubtitle("Usa tu huella dactilar o rostro para iniciar sesión")
+                .setSubtitle("Usa tu huella dactilar para iniciar sesión")
                 .setNegativeButtonText("Usar código de sensor") // Opción para volver al login normal
                 .setConfirmationRequired(true)
                 .build();
@@ -243,28 +258,32 @@ public class MainActivity extends AppCompatActivity {
         biometricPrompt.authenticate(promptInfo);
     }
 
-    // Dentro de MainActivity.java
-
+    /**
+     * @brief Guarda el código del sensor en SharedPreferences e inicia la \ref SesionSensorActivity.
+     * Esta función se llama tras un login exitoso (manual o biométrico).
+     * @param code El código de sensor verificado.
+     */
     private void iniciarSesionExitosa(String code) {
+        // Esta acción se realiza siempre, sobreescribiendo el ID con el mismo ID, lo cual es seguro.
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        prefs.edit().putString("LAST_SENSOR_ID", code).apply();
+        Log.d("BIOMETRIA", "ID de sensor guardado/actualizado: " + code);
 
-        // 1. Lógica de Guardado (SOLO si no es la propia biometría la que lo está llamando)
-        if (!"BIOMETRIC_CODE".equals(code)) {
-            SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
-            prefs.edit().putString("LAST_SENSOR_ID", code).apply();
-            Log.d("BIOMETRIA", "ID de sensor guardado para uso futuro: " + code);
-        }
-
-        // 2. Inicio de actividad (Se mantiene igual)
+        // Inicio de actividad
         Intent intent = new Intent(MainActivity.this, SesionSensorActivity.class);
         intent.putExtra("SENSOR_CODE", code);
         startActivity(intent);
         finish();
     }
 
-    // --- Fin Metodo para acceso biométrico ----------------------------------------------------------------------
+    // --- Fin Metodos para acceso biométrico ----------------------------------------------------------------------
 
     // --- Inicio Metodo para comprobación firebase ----------------------------------------------------------------------
 
+    /**
+     * @brief Verifica asíncronamente si el código del sensor existe como documento en la colección 'sensores' de Firebase Firestore.
+     * @param sensorCode El código de sensor ingresado por el usuario.
+     */
     private void checkSensorCodeInDatabase(String sensorCode) {
         Toast.makeText(this, "Verificando código en Firestore...", Toast.LENGTH_SHORT).show();
 
