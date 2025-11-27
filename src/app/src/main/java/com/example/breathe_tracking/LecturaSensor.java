@@ -46,6 +46,7 @@ public class LecturaSensor {
 
     /**
      * @brief Constructor con todos los campos de datos y contexto.
+     * (O3:float, temperatura:float, co2:int, bateria:int, ubicacion:String, estado:String) -> LecturaSensor() -> ()
      * @param O3 Nivel de ozono.
      * @param temperatura Nivel de temperatura.
      * @param co2 Nivel de dióxido de carbono.
