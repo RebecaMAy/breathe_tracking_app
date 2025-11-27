@@ -68,6 +68,8 @@
         <activity android:name=".SesionSensorActivity" />
         
         <activity android:name=".EnvioIncidenciasActivity" />
+        
+        <activity android:name=".InformacionActivity" />
 
 
 
