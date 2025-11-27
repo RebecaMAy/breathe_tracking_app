@@ -70,6 +70,8 @@ public class SesionSensorActivity extends AppCompatActivity {
     private TextView reportarIncidenciaTextView;
     /** @brief Muestra el código o nombre del sensor que se está rastreando. */
     private TextView nombreSensorTextView;
+    /** @brief Botón para ir a la pantalla de gráficas de información. */
+    private TextView verGraficasTextView;
 
     //Variables para dibujar con colores las medidas
     /** @brief Barra de progreso visual para el nivel de CO2. */
@@ -127,6 +129,7 @@ public class SesionSensorActivity extends AppCompatActivity {
         estadoTextView = findViewById(R.id.textView_estado);
         reportarIncidenciaTextView = findViewById(R.id.textView_reportar_incidencia);
         nombreSensorTextView = findViewById(R.id.textView_nombreSensor);
+        verGraficasTextView = findViewById(R.id.textView_graficas);
         ImageView cerrarSesionButton = findViewById(R.id.imageView_cerrarSesion);
 
         dataHolder = TrackingDataHolder.getInstance();
@@ -174,6 +177,15 @@ public class SesionSensorActivity extends AppCompatActivity {
             intent.putExtra("UBICACION", ubicacion);
             intent.putExtra("ULTIMA_CONEXION", ultimaConexion);
             
+            startActivity(intent);
+        });
+
+        /**
+         * @brief Listener para el botón "Saber más..." (gráficas).
+         * Abre la actividad InformacionActivity.
+         */
+        verGraficasTextView.setOnClickListener(v -> {
+            Intent intent = new Intent(SesionSensorActivity.this, InformacionActivity.class);
             startActivity(intent);
         });
 
