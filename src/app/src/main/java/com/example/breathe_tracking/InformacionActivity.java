@@ -1,5 +1,6 @@
 package com.example.breathe_tracking;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -8,6 +9,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -19,19 +21,48 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IFillFormatter;
-import com.github.mikephil.charting.interfaces.dataprovider.LineDataProvider;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
+/**
+ * @class GasData
+ * @brief Almacena los valores históricos de los gases y su timestamp.
+ */
+class GasData {
+    float ozono;
+    int co2;
+    long timestamp;
+
+    public GasData(float ozono, int co2, long timestamp) {
+        this.ozono = ozono;
+        this.co2 = co2;
+        this.timestamp = timestamp;
+    }
+}
+
+/**
+ * @class InformacionActivity
+ * @brief Muestra el gráfico de datos históricos (CO2 y O3) vinculados al sensor
+ * que inició la sesión, leídos de Firebase Firestore.
+ */
 public class InformacionActivity extends AppCompatActivity {
+
+    // --- VARIABLES DE FIREBASE ---
+    private FirebaseFirestore db;
+    private String sensorId;
+    private List<GasData> historicalData = new ArrayList<>();
+    // -----------------------------
 
     private LineChart chart;
     private Spinner spinner;
     private ImageView imgCarita;
-    private ImageView imgBackArrow; // Flecha para volver
+    private ImageView imgBackArrow;
     private TextView txtExplicacion;
 
     @Override
@@ -39,17 +70,29 @@ public class InformacionActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.informacion);
 
+        // 1. Inicialización de Firebase y obtención del ID
+        db = FirebaseFirestore.getInstance();
+
+        // Obtención del ID del sensor pasado desde SesionSensorActivity
+        Intent intent = getIntent();
+        if (intent.hasExtra("SENSOR_ID")) {
+            sensorId = intent.getStringExtra("SENSOR_ID");
+        } else {
+            // ID por defecto o manejo de error si es nulo
+            sensorId = "12345";
+            Toast.makeText(this, "Advertencia: ID de sensor no encontrado. Usando: " + sensorId, Toast.LENGTH_SHORT).show();
+        }
+
+
         chart = findViewById(R.id.chart_gases);
         spinner = findViewById(R.id.spinner_gases);
         imgCarita = findViewById(R.id.img_carita);
         imgBackArrow = findViewById(R.id.img_back_arrow);
         txtExplicacion = findViewById(R.id.txt_explicacion);
 
-        // Configurar botón de volver
         imgBackArrow.setOnClickListener(v -> finish());
 
-        // 1. Configurar Spinner con los nombres de los gases
-        // El orden debe coincidir con la lógica del switch en cargarDatosGas
+        // 2. Configurar Spinner
         String[] gases = {
                 "Ozono (O3)",
                 "Monóxido de Carbono (CO)",
@@ -57,24 +100,78 @@ public class InformacionActivity extends AppCompatActivity {
                 "Dióxido de Azufre (SO2)",
                 "Dióxido de Carbono (CO2)"
         };
-        
+
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, gases);
         spinner.setAdapter(adapter);
 
-        // 2. Listener del Spinner
+        // 3. Listener del Spinner
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                // Pasamos la posición o el nombre para identificar el gas
+                // Llama a cargarDatosGas, que maneja datos reales o simulados
                 cargarDatosGas(position);
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        // Configuración base del gráfico
+        // 4. Configuración base del gráfico
         configurarEstiloGrafico();
+
+        // 5. Cargar los datos de Firebase y luego cargar el gráfico por defecto (Ozono)
+        cargarDatosDeFirebase();
     }
+
+    /**
+     * @brief Consulta Firestore para obtener los datos históricos del sensor actual.
+     */
+    private void cargarDatosDeFirebase() {
+        if (sensorId == null) return;
+
+        Toast.makeText(this, "Cargando datos históricos...", Toast.LENGTH_SHORT).show();
+
+        // Consulta la subcolección 'mediciones'
+        db.collection("sensores").document(sensorId).collection("mediciones")
+                // Se asume que el campo 'fecha' o 'timestamp' se usa para ordenar
+                .orderBy("fecha", Query.Direction.ASCENDING)
+                .limit(50)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    historicalData.clear();
+
+                    if (queryDocumentSnapshots.isEmpty()) {
+                        Toast.makeText(this, "No se encontraron datos históricos para este sensor.", Toast.LENGTH_LONG).show();
+                        // Forzamos a dibujar la gráfica con valores simulados
+                        cargarDatosGas(0);
+                        return;
+                    }
+
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+
+                        // Extracción segura de datos
+                        Float ozono = document.get("ozono", Float.class);
+                        Long co2Long = document.getLong("co2");
+
+                        // Obtener el timestamp (asumiendo que se guardó como FieldValue.serverTimestamp() o similar)
+                        Long timestampLong = document.getTimestamp("fecha") != null ? document.getTimestamp("fecha").getSeconds() * 1000 : 0L;
+
+                        if (ozono != null && co2Long != null) {
+                            historicalData.add(new GasData(ozono, co2Long.intValue(), timestampLong));
+                        }
+                    }
+
+                    // Después de cargar, cargar el gráfico por defecto (Ozono) con los datos reales
+                    cargarDatosGas(0);
+                    Toast.makeText(this, "Datos históricos cargados con éxito.", Toast.LENGTH_SHORT).show();
+
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Error al cargar datos: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // En caso de fallo en la BD, se intenta cargar la simulación
+                    cargarDatosGas(0);
+                });
+    }
+
 
     private void configurarEstiloGrafico() {
         chart.getDescription().setEnabled(false);
@@ -82,91 +179,92 @@ public class InformacionActivity extends AppCompatActivity {
         chart.setDragEnabled(true);
         chart.setScaleEnabled(true);
         chart.setPinchZoom(true);
-        
-        // Fondo gris muy claro para resaltar mejor el gradiente si es necesario, o transparente
-        // chart.setBackgroundColor(Color.WHITE);
 
         XAxis xAxis = chart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setDrawGridLines(false);
-        
-        chart.getAxisRight().setEnabled(false); // Desactivar eje derecho
+
+        chart.getAxisRight().setEnabled(false);
     }
 
+    /**
+     * @brief Carga y dibuja los datos del gas seleccionado, usando datos reales si existen
+     * para O3 y CO2, y datos simulados para los otros.
+     * @param position Índice del gas seleccionado en el Spinner.
+     */
     private void cargarDatosGas(int position) {
-        // Definición de variables según el gas seleccionado
-        float limiteSeguro = 0f;   // Límite superior de "Bueno"
-        float limitePeligro = 0f;  // Límite inferior de "Peligroso"
+
+        float limiteSeguro = 0f;
+        float limitePeligro = 0f;
         String unidad = "";
         String nombreGas = "";
-        float valorMinSimulado = 0f;
-        float valorMaxSimulado = 0f;
 
-        // Configuración de rangos según lo solicitado
+        List<Entry> entries = new ArrayList<>();
+        boolean usandoDatosReales = false;
+
         switch (position) {
             case 0: // Ozono (O3)
                 nombreGas = "Ozono (O3)";
                 unidad = "ppm";
-                // Actualizado: 0-0.6 Seguro, 0.6-0.9 Riesgo, >0.9 Peligroso
                 limiteSeguro = 0.6f;
                 limitePeligro = 0.9f;
-                valorMinSimulado = 0.3f;
-                valorMaxSimulado = 1.1f; // Ajustado para ver picos peligrosos
-                break;
-
-            case 1: // Monóxido de Carbono (CO)
-                nombreGas = "Monóxido de Carbono (CO)";
-                unidad = "mg/m³";
-                limiteSeguro = 10f;
-                limitePeligro = 30f;
-                valorMinSimulado = 5f;
-                valorMaxSimulado = 40f;
-                break;
-
-            case 2: // Dióxido de Nitrógeno (NO2)
-                nombreGas = "Dióxido de Nitrógeno (NO2)";
-                unidad = "µg/m³";
-                limiteSeguro = 200f;
-                limitePeligro = 400f;
-                valorMinSimulado = 100f;
-                valorMaxSimulado = 500f;
-                break;
-
-            case 3: // Dióxido de Azufre (SO2)
-                nombreGas = "Dióxido de Azufre (SO2)";
-                unidad = "µg/m³";
-                limiteSeguro = 350f;
-                limitePeligro = 500f;
-                valorMinSimulado = 200f;
-                valorMaxSimulado = 600f;
+                // --- DATOS REALES ---
+                if (!historicalData.isEmpty()) {
+                    usandoDatosReales = true;
+                    for (int i = 0; i < historicalData.size(); i++) {
+                        entries.add(new Entry(i, historicalData.get(i).ozono));
+                    }
+                }
                 break;
 
             case 4: // Dióxido de Carbono (CO2)
                 nombreGas = "Dióxido de Carbono (CO2)";
                 unidad = "ppm";
-                // Actualizado: 0-800 Seguro, 800-1200 Riesgo, >1200 Peligroso
                 limiteSeguro = 800f;
                 limitePeligro = 1200f;
-                valorMinSimulado = 600f;
-                valorMaxSimulado = 1500f; // Ajustado para ver picos peligrosos
+                // --- DATOS REALES ---
+                if (!historicalData.isEmpty()) {
+                    usandoDatosReales = true;
+                    for (int i = 0; i < historicalData.size(); i++) {
+                        entries.add(new Entry(i, historicalData.get(i).co2));
+                    }
+                }
+                break;
+
+            case 1: // Monóxido de Carbono (CO) (SIMULADO)
+            case 2: // Dióxido de Nitrógeno (NO2) (SIMULADO)
+            case 3: // Dióxido de Azufre (SO2) (SIMULADO)
+                // Lógica de límites para gases simulados
+                nombreGas = (position == 1) ? "Monóxido de Carbono (CO)" : (position == 2) ? "Dióxido de Nitrógeno (NO2)" : "Dióxido de Azufre (SO2)";
+                unidad = (position == 1) ? "mg/m³" : "µg/m³";
+                limiteSeguro = (position == 1) ? 10f : (position == 2) ? 200f : 350f;
+                limitePeligro = (position == 1) ? 30f : (position == 2) ? 400f : 500f;
+
+                // Generación de datos simulados
+                float valorMinSimulado = (position == 1) ? 5f : (position == 2) ? 100f : 200f;
+                float valorMaxSimulado = (position == 1) ? 40f : (position == 2) ? 500f : 600f;
+                float rango = valorMaxSimulado - valorMinSimulado;
+                for (int i = 0; i < 24; i++) {
+                    float valor = (float) (valorMinSimulado + Math.random() * rango);
+                    entries.add(new Entry(i, valor));
+                }
                 break;
         }
 
-        // Generación de datos simulados
-        List<Entry> entries = new ArrayList<>();
-        for (int i = 0; i < 24; i++) {
-            // Generar valor aleatorio dentro de un rango razonable para el ejemplo
-            float rango = valorMaxSimulado - valorMinSimulado;
-            float valor = (float) (valorMinSimulado + Math.random() * rango);
-            entries.add(new Entry(i, valor));
+        // Si se seleccionó O3 o CO2 y no hay datos reales, se muestra vacío o un mensaje.
+        if (!usandoDatosReales && (position == 0 || position == 4)) {
+            Toast.makeText(this, "No hay datos reales para graficar. Intente más tarde.", Toast.LENGTH_LONG).show();
+            chart.setData(null);
+            chart.invalidate();
+            return;
         }
 
-        // Configurar Eje Y (Izquierdo)
-        YAxis leftAxis = chart.getAxisLeft();
-        leftAxis.removeAllLimitLines(); // Limpiar líneas anteriores
-        leftAxis.setAxisMinimum(0f);    // Siempre empezar en 0
 
-        // Línea de Límite Seguro (Verde)
+        // Configuración de Eje Y y Limit Lines
+        YAxis leftAxis = chart.getAxisLeft();
+        leftAxis.removeAllLimitLines();
+        leftAxis.setAxisMinimum(0f);
+
         LimitLine llSeguro = new LimitLine(limiteSeguro, "Seguro (" + limiteSeguro + " " + unidad + ")");
         llSeguro.setLineColor(Color.GREEN);
         llSeguro.setLineWidth(2f);
@@ -174,7 +272,6 @@ public class InformacionActivity extends AppCompatActivity {
         llSeguro.setLabelPosition(LimitLine.LimitLabelPosition.RIGHT_BOTTOM);
         llSeguro.setTextSize(10f);
 
-        // Línea de Límite Peligroso (Rojo)
         LimitLine llPeligro = new LimitLine(limitePeligro, "Peligroso (" + limitePeligro + " " + unidad + ")");
         llPeligro.setLineColor(Color.RED);
         llPeligro.setLineWidth(2f);
@@ -185,33 +282,24 @@ public class InformacionActivity extends AppCompatActivity {
         leftAxis.addLimitLine(llSeguro);
         leftAxis.addLimitLine(llPeligro);
 
-        // Crear Dataset
-        LineDataSet dataSet = new LineDataSet(entries, "Nivel de " + nombreGas);
-        
-        // Configuración de COLOR del trazo
-        dataSet.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
-        
-        // 1. LÍNEA MÁS FINA
-        dataSet.setLineWidth(1f); 
-        
-        // Configuración de los puntos (círculos)
-        dataSet.setCircleRadius(2f); // Círculos también un poco más pequeños
-        dataSet.setDrawCircleHole(false);
-        dataSet.setDrawValues(false); // Sin números sobre los puntos
 
-        // 2. RELLENO CON GRADIENTE SEMÁFORO
+        // Creación del Dataset y estilización
+        LineDataSet dataSet = new LineDataSet(entries, "Nivel de " + nombreGas);
+        dataSet.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        dataSet.setLineWidth(1f);
+        dataSet.setCircleRadius(2f);
+        dataSet.setDrawCircleHole(false);
+        dataSet.setDrawValues(false);
         dataSet.setDrawFilled(true);
         dataSet.setFillDrawable(ContextCompat.getDrawable(this, R.drawable.gradiente_semaforo));
-        
-        // Quitamos transparencia por código para usar la del XML
-        dataSet.setFillAlpha(255); 
+        dataSet.setFillAlpha(255);
 
+        // Aplicar y animar el gráfico
         LineData lineData = new LineData(dataSet);
         chart.setData(lineData);
         chart.animateX(1000);
-        
-        // Forzar repintado para actualizar ejes y limites
-        chart.invalidate(); 
+
+        chart.invalidate();
 
         // Evaluar exposición con los nuevos límites
         evaluarExposicion(entries, limiteSeguro, limitePeligro);
@@ -230,17 +318,13 @@ public class InformacionActivity extends AppCompatActivity {
             }
         }
 
-        // Lógica de evaluación
         if (contadorPeligroso > 0) {
-            // Si hay al menos 1 medición en rango peligroso
             imgCarita.setImageResource(R.drawable.ic_face_sad);
             txtExplicacion.setText("¡Alerta! Se han detectado niveles PELIGROSOS. Evita la zona.");
         } else if (contadorRiesgo > 3) {
-            // Si hay varias mediciones en riesgo
             imgCarita.setImageResource(R.drawable.ic_face_neutral);
             txtExplicacion.setText("Precaución: Niveles de riesgo detectados. La calidad del aire no es óptima.");
         } else {
-            // Todo mayormente seguro
             imgCarita.setImageResource(R.drawable.ic_face_happy);
             txtExplicacion.setText("¡Excelente! Calidad del aire segura.");
         }
