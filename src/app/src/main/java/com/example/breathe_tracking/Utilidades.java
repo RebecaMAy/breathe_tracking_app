@@ -15,6 +15,7 @@ import java.util.UUID;
 /**
  * @class Utilidades
  * @brief Colección de métodos utilitarios estáticos para conversiones de tipos de bajo nivel.
+ * Copyrigth © 2025
  */
 public class Utilidades {
 

@@ -30,6 +30,8 @@ import java.util.Locale;
  * @class SesionSensorActivity
  * @brief Clase que representa la actividad de la sesión del sensor.
  *
+ * Copyrigth © 2025
+ *
  * Se encarga de:
  * - Mostrar datos en tiempo real (CO2, Ozono, Temp, Batería, Ubicación) obtenidos del \ref SensorTrackingService.
  * - Utilizar \ref TrackingDataHolder (LiveData) para observar los cambios en las mediciones.
@@ -42,7 +44,7 @@ import java.util.Locale;
 
 /**
  * Clase que representa la actividad de la sesión del sensor.
- * - Muestra datos, incidencias, alertas, ubicacion, bateria baja (30/10 - Sandra)
+ * - Muestra datos, incidencias, alertas, ubicacion, bateria baja (11/11/25 - Sandra)
  * - Conexión con base de datos (19/11/25 - Rocio)
  */
 

@@ -50,6 +50,9 @@ class GasData {
  * @class InformacionActivity
  * @brief Muestra el gráfico de datos históricos (CO2 y O3) vinculados al sensor
  * que inició la sesión, leídos de Firebase Firestore.
+ *
+ * Copyrigth © 2025
+ *
  */
 public class InformacionActivity extends AppCompatActivity {
 
