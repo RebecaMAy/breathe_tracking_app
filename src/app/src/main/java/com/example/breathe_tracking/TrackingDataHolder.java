@@ -53,6 +53,9 @@ public class TrackingDataHolder {
     /** @brief Contiene un mensaje sobre incidencias (principalmente la pérdida de conexión del sensor). */
     public final MutableLiveData<String> incidenciaData = new MutableLiveData<>();
 
+    /** @brief Nuevo: Contiene el historial de las últimas 4 incidencias enviadas. */
+    public final MutableLiveData<List<String>> incidenciasEnviadasData = new MutableLiveData<>(new ArrayList<>());
+
     /**
      * @brief Constructor privado para forzar el patrón Singleton.
      */

@@ -123,5 +123,15 @@
         app:layout_constraintStart_toStartOf="@+id/view_incidencias"
         app:layout_constraintTop_toBottomOf="@+id/textView_TituloIncidencias" />
 
+    <Button
+        android:id="@+id/button_incidenciasManuales"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Reportar incidencia"
+        app:layout_constraintBottom_toBottomOf="@+id/view_incidencias"
+        app:layout_constraintEnd_toEndOf="@+id/view_incidencias"
+        app:layout_constraintStart_toStartOf="@+id/view_incidencias" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

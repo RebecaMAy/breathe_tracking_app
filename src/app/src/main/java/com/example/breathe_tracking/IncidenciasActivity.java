@@ -1,7 +1,9 @@
 package com.example.breathe_tracking;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
@@ -15,6 +17,7 @@ public class IncidenciasActivity extends AppCompatActivity {
     private TextView ultimasAlertasTextView;
     private TextView incidenciasEnviadasTextView;
     private ImageView backArrow;
+    private Button reportarIncidenciaButton;
     private TrackingDataHolder dataHolder;
 
     /** @brief Lista que almacena las últimas 6 alertas de mediciones para mostrar en la UI. */
@@ -30,10 +33,17 @@ public class IncidenciasActivity extends AppCompatActivity {
         ultimasAlertasTextView = findViewById(R.id.textView_ultimasAlertas);
         incidenciasEnviadasTextView = findViewById(R.id.textView_incidenciasEnviadas);
         backArrow = findViewById(R.id.img_back_arrow);
+        reportarIncidenciaButton = findViewById(R.id.button_incidenciasManuales);
 
         dataHolder = TrackingDataHolder.getInstance();
 
         backArrow.setOnClickListener(v -> finish());
+
+        reportarIncidenciaButton.setOnClickListener(v -> {
+            Intent intent = new Intent(IncidenciasActivity.this, EnvioIncidenciasActivity.class);
+            startActivity(intent);
+        });
+
         setupObservers();
     }
 
@@ -67,9 +77,12 @@ public class IncidenciasActivity extends AppCompatActivity {
             }
         });
 
-        dataHolder.incidenciaData.observe(this, incidencia -> {
-            if (incidencia != null) {
-                incidenciasEnviadasTextView.setText(incidencia);
+        // Observador para el historial de incidencias enviadas
+        dataHolder.incidenciasEnviadasData.observe(this, history -> {
+            if (history != null && !history.isEmpty()) {
+                incidenciasEnviadasTextView.setText(TextUtils.join("\n\n", history));
+            } else {
+                incidenciasEnviadasTextView.setText("No hay incidencias enviadas");
             }
         });
 
