@@ -269,8 +269,8 @@ public class SensorTrackingService extends Service {
         startForeground(NOTIFICATION_ID, notification);
         startLocationUpdates();
         inicializarYComenzarEscaneoBeacon();
-        // Inicializamos al vigilante de conexión
-        resetWatchdog();
+        // Inicializamos el temporizador del vigilante de conexión, pero no forzamos el estado a "Conectado".
+        resetWatchdogTimer();
 
         // Asignar el código de sensor fijo
         //sensorCode = SENSOR_DOCUMENT_ID;
@@ -280,6 +280,7 @@ public class SensorTrackingService extends Service {
         return START_STICKY;
     }
     // --- Fin onStarCommand -----------------------------------------------------------------------------
+
 
     //--- onDestory ------------------------------------------------------------------------------------
     // Se llama cuando la Activity (SesionSensorActivity) se destruye
@@ -345,6 +346,7 @@ public class SensorTrackingService extends Service {
 
     // --- fin detener escaner de beacon --------------------------------------------------------------
 
+
     // --- mostrar la informacion del beacon -----------------------------------------------------------
     /**
      * @brief Procesa el resultado del escaneo BLE, filtra el dispositivo "rocio" y decodifica el payload.
@@ -357,8 +359,11 @@ public class SensorTrackingService extends Service {
         BluetoothDevice device = resultado.getDevice();
         if (device == null || device.getName() == null || !device.getName().equals("rocio")) return;
 
-        // Reiniciamos el watchdog
-        resetWatchdog();
+        // Se ha recibido un paquete del sensor.
+        // 1. Marcar el estado como "Conectado" (si no lo estaba ya) y limpiar la alerta de desconexión.
+        handleSensorReconnected();
+        // 2. Reiniciar el temporizador que detecta la próxima desconexión.
+        resetWatchdogTimer();
         
         // --- NUEVO: Actualizamos RSSI (Media Ponderada) ---
         int rawRssi = resultado.getRssi();
@@ -424,6 +429,7 @@ public class SensorTrackingService extends Service {
 
     }
     //--- fin mostrar la informacion del beacon -------------------------------------------------------
+
 
     //--- Alertas sobre medidas -----------------------------------------------------------------------
     /**
@@ -512,6 +518,7 @@ public class SensorTrackingService extends Service {
 
     // --- fin alertas sobre medidas ---------------------------------------------------------------------------------
 
+
     // --- Notificaciones -------------------------------------------------------------------------------
     // Crea una notificacion de alerta
     /**
@@ -522,8 +529,24 @@ public class SensorTrackingService extends Service {
      * @param notificationId ID único para esta alerta, permite cancelarla posteriormente.
      */
     private void sendAlertNotification(String title, String message, int notificationId) {
-        Intent notificationIntent = new Intent(this, IncidenciasActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+        Intent notificationIntent;
+
+        // Si es la alerta de conexión, redirige a la pantalla principal del sensor.
+        if (notificationId == CONNECTION_ALERT_ID) {
+            notificationIntent = new Intent(this, SesionSensorActivity.class);
+            // Es crucial pasar el ID del sensor para que la actividad sepa qué mostrar.
+            if (sensorCode != null) {
+                notificationIntent.putExtra("SENSOR_CODE", sensorCode);
+            }
+        } else {
+            // Para el resto de las alertas (mediciones), redirige a la pantalla de incidencias.
+            notificationIntent = new Intent(this, IncidenciasActivity.class);
+        }
+
+        // Usamos FLAG_UPDATE_CURRENT para asegurar que el Intent se actualiza correctamente,
+        // especialmente si la actividad destino o sus extras cambian. El requestCode puede ser
+        // el ID de la notificación para asegurar que cada una tenga un PendingIntent único.
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Notification n = new NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
                 .setContentTitle(title)
@@ -531,9 +554,11 @@ public class SensorTrackingService extends Service {
                 .setSmallIcon(R.drawable.logo_app)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
+                .setAutoCancel(true) // La notificación se cierra al pulsarla
                 .build();
         getSystemService(NotificationManager.class).notify(notificationId, n);
     }
+
 
     // Elimina una notificacion si ya no existe
     /**
@@ -596,24 +621,28 @@ public class SensorTrackingService extends Service {
     }
     // --- fin localizacion ----------------------------------------------------------------------------
 
+
     // --- Vigilante de Conexión -----------------------------------------------------------------------
-    // cuenta 3 minutos para saber si el sensor está desconectado, si recibe datos lo reinicia para volver a contar los 3 minutos
-    // SI no recibe los datos en 3 minutos se muestra una alerta y se reinicia el watchdog
     /**
-     * @brief Reinicia el temporizador del watchdog de conexión.
-     * Si el servicio estaba en estado "Desconectado", al recibir datos lo cambia a "Conectado" y cancela la alerta.
-     * () -> resetWatchdog() -> ()
+     * @brief Reinicia el temporizador del watchdog. Se llama al iniciar el servicio y al recibir datos.
      */
-    private void resetWatchdog() {
+    private void resetWatchdogTimer() {
         watchdogHandler.removeCallbacks(watchdogRunnable);
         watchdogHandler.postDelayed(watchdogRunnable, WATCHDOG_DELAY_MS);
+    }
 
+    /**
+     * @brief Gestiona el estado de reconexión. Si el sensor estaba desconectado, lo marca como
+     * "Conectado" y limpia las alertas visuales correspondientes.
+     */
+    private void handleSensorReconnected() {
+        // Solo actuar si el estado anterior NO era "Conectado"
         if (!"Conectado".equals(dataHolder.estadoData.getValue())) {
             Log.i(ETIQUETA_LOG, "¡Reconexión con el sensor detectada!");
             cancelAlertNotification(CONNECTION_ALERT_ID);
             dataHolder.incidenciaData.postValue("Sin incidencias");
+            dataHolder.estadoData.postValue("Conectado");
         }
-        dataHolder.estadoData.postValue("Conectado");
     }
     // --- fin vigilante de conexión -------------------------------------------------------------------
     /**
@@ -624,6 +653,7 @@ public class SensorTrackingService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
+
 
     // --- Inicio subirDatosFirebase --------------------------------------------------------------------------------------------------
     /**
@@ -655,6 +685,7 @@ public class SensorTrackingService extends Service {
                     Log.e("Firestore", "Error al escribir en el historial", e);
                 });
 
+
         // Subida a Campos Directos (Última Lectura)
 
         Map<String, Object> camposDirectos = new HashMap<>();
@@ -679,6 +710,7 @@ public class SensorTrackingService extends Service {
     }
 
     // --- Fin subirDatosFirebase --------------------------------------------------------------------------------------------------
+
 
     //Métodos para test.
 
