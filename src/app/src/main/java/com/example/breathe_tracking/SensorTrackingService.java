@@ -45,7 +45,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.StringJoiner;
+import java.util.Objects;
 
 // Imports de Firebase
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -124,6 +124,8 @@ public class SensorTrackingService extends Service {
     private float lastUpdatedOzono = -999.0f;
     /** @brief Almacena el último valor de CO2 recibido. */
     private int lastUpdatedCo2 = -999;
+    /** @brief Flag para controlar el envío único de la notificación de batería baja. */
+    private boolean batteryAlertSent = false;
     
     // --- NUEVO: Memoria para RSSI (Media Ponderada) ---
     /** @brief Almacena el RSSI suavizado para evitar fluctuaciones bruscas. Inicialmente -999 (sin señal). */
@@ -138,6 +140,12 @@ public class SensorTrackingService extends Service {
     private String sensorCode;
     /** @brief Referencia al documento del sensor en Firestore. */
     private DocumentReference sensorDocRef;
+
+    // Lista para gestionar las alertas
+    /** @brief Lista que almacena las últimas 4 alertas. */
+    private final List<String> alertList = new ArrayList<>();
+    /** @brief Número máximo de alertas que se almacenarán. */
+    private static final int MAX_ALERTS = 4;
 
 
     // --- onCreate --------------------------------------------------------------------------------------
@@ -430,56 +438,81 @@ public class SensorTrackingService extends Service {
      * @param bateria Porcentaje de batería.
      */
     private void checkAlerts(int co2, float ozono, float temperatura, int bateria) {
-        List<String> currentAlertMessages = new ArrayList<>();
         String currentTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        boolean newAlert = false;
 
-        // SI las medidas entran en un rango determinado se mostrara una alerta en el tablón de alertas y en notificaciones
+        // Generar mensajes de alerta basados en umbrales
         if (co2 >= 1200) {
             String message = currentTime + " - Nivel de CO2 elevado: " + co2 + " ppm";
-            currentAlertMessages.add(message);
-            sendAlertNotification("Alerta de CO2", "Nivel de CO2 elevado: " + co2 + " ppm", CO2_ALERT_ID);
+            if (addAlert(message)) {
+                sendAlertNotification("Alerta de CO2", "Nivel de CO2 elevado: " + co2 + " ppm", CO2_ALERT_ID);
+                newAlert = true;
+            }
         } else {
             cancelAlertNotification(CO2_ALERT_ID);
         }
 
         if (ozono >= 0.9) {
             String message = currentTime + " - Nivel de Ozono elevado: " + String.format(Locale.getDefault(), "%.3f ppm", ozono);
-            currentAlertMessages.add(message);
-            sendAlertNotification("Alerta de Ozono", "Nivel de Ozono elevado: " + String.format(Locale.getDefault(), "%.3f ppm", ozono), OZONE_ALERT_ID);
+            if (addAlert(message)) {
+                sendAlertNotification("Alerta de Ozono", "Nivel de Ozono elevado: " + String.format(Locale.getDefault(), "%.3f ppm", ozono), OZONE_ALERT_ID);
+                newAlert = true;
+            }
         } else {
             cancelAlertNotification(OZONE_ALERT_ID);
         }
 
         if (temperatura > 35) {
             String message = currentTime + " - Temperatura elevada: " + String.format(Locale.getDefault(), "%.1f ºC", temperatura);
-            currentAlertMessages.add(message);
-            sendAlertNotification("Alerta de Temperatura", "Temperatura elevada: " + String.format(Locale.getDefault(), "%.1f ºC", temperatura), TEMP_ALERT_ID);
+            if (addAlert(message)) {
+                sendAlertNotification("Alerta de Temperatura", "Temperatura elevada: " + String.format(Locale.getDefault(), "%.1f ºC", temperatura), TEMP_ALERT_ID);
+                newAlert = true;
+            }
         } else {
             cancelAlertNotification(TEMP_ALERT_ID);
         }
 
-        // Si la bateria es baja solo se muestra la notificacion, no la alerta
+        // Si la bateria es baja solo se muestra la notificacion, no se añade a la lista de alertas.
         if (bateria <= 15) {
-            sendAlertNotification("Alerta de Batería", "Nivel de batería bajo: " + bateria + "%", BATTERY_ALERT_ID);
-        } else {
-            cancelAlertNotification(BATTERY_ALERT_ID);
-        }
-
-        // Si no hay alertas ni incidencias mostramos: Sin alertas/incidencias
-        if (currentAlertMessages.isEmpty()) {
-            dataHolder.alertData.postValue("Sin alertas");
-        } else {
-            StringJoiner joiner = new StringJoiner("\n\n");
-            for (String msg : currentAlertMessages) {
-                joiner.add(msg);
+            // Solo enviar la notificación una vez
+            if (!batteryAlertSent) {
+                sendAlertNotification("Alerta de Batería", "Nivel de batería bajo: " + bateria + "%", BATTERY_ALERT_ID);
+                batteryAlertSent = true;
             }
-            dataHolder.alertData.postValue(joiner.toString());
+        } else {
+            // Si la batería se recupera, se cancela la notificación y se resetea el flag
+            cancelAlertNotification(BATTERY_ALERT_ID);
+            batteryAlertSent = false;
         }
 
-        if ("Conectado".equals(dataHolder.estadoData.getValue())) {
-            dataHolder.incidenciaData.postValue("Sin incidencias");
+        // Actualizar LiveData solo si hay una nueva alerta
+        if (newAlert) {
+            dataHolder.alertData.postValue(new ArrayList<>(alertList));
         }
     }
+
+    /**
+     * @brief Añade una nueva alerta a la lista, gestionando el tamaño máximo.
+     * @param alertMessage Mensaje de la alerta.
+     * @return true si la alerta es nueva y se ha añadido; false en caso contrario.
+     */
+    private boolean addAlert(String alertMessage) {
+        // Evitar duplicados
+        if (alertList.contains(alertMessage)) {
+            return false;
+        }
+
+        // Añadir la nueva alerta al principio de la lista
+        alertList.add(0, alertMessage);
+
+        // Si la lista supera el tamaño máximo, eliminar la más antigua
+        if (alertList.size() > MAX_ALERTS) {
+            alertList.remove(alertList.size() - 1);
+        }
+
+        return true;
+    }
+
     // --- fin alertas sobre medidas ---------------------------------------------------------------------------------
 
 
