@@ -170,6 +170,8 @@ public class SesionSensorActivity extends AppCompatActivity {
 
         notificacionesButton.setOnClickListener(v -> {
             Intent intent = new Intent(SesionSensorActivity.this, IncidenciasActivity.class);
+            intent.putExtra("SENSOR_NAME", sensorId);
+            intent.putExtra("UBICACION", ubicacionTextView.getText().toString());
             startActivity(intent);
         });
 

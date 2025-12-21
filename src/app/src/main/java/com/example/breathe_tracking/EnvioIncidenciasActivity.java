@@ -42,6 +42,11 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
      * @brief Método llamado al crear la actividad.
      * @param savedInstanceState Si la actividad se está recreando, este Bundle contiene los datos de estado más recientes.
      */
+
+    private String sensorIdRecibido;
+    private String ubicacionRecibida;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,6 +60,13 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
 
         // --- Lógica de Modo (Automático vs. Manual) ---
         Intent intent = getIntent();
+
+        if (intent != null) {
+            // Recogemos los datos independientemente de si el modo es automático o manual
+            sensorIdRecibido = intent.getStringExtra("SENSOR_ID");
+            ubicacionRecibida = intent.getStringExtra("UBICACION");
+        }
+
         // Comprobamos si el intent contiene datos de un sensor. Si no, es un reporte manual.
         if (intent != null && intent.hasExtra("SENSOR_NAME")) {
             // --- Modo Automático: Precargar datos ---
@@ -111,10 +123,12 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
             incidencia.put("resuelta", false);
             incidencia.put("fecha", FieldValue.serverTimestamp());
 
-            // En modo manual, no tenemos ID de sensor ni ubicación, por lo que no se añaden.
-            if (intent != null && intent.hasExtra("SENSOR_NAME")) {
-                incidencia.put("sensor_id", intent.getStringExtra("SENSOR_NAME"));
-                incidencia.put("ubicacion", intent.getStringExtra("UBICACION"));
+            // Esto sube (en caso de recibirlo) a firebase el id_sensor cuando la incidencia es manual
+            if (sensorIdRecibido != null) {
+                incidencia.put("sensor_id", sensorIdRecibido);
+            }
+            if (ubicacionRecibida != null) {
+                incidencia.put("ubicacion", ubicacionRecibida);
             }
             // ------------------------------------------
 

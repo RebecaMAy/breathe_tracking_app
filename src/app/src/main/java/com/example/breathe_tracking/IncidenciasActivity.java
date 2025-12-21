@@ -19,6 +19,9 @@ public class IncidenciasActivity extends AppCompatActivity {
     private ImageView backArrow;
     private Button reportarIncidenciaButton;
     private TrackingDataHolder dataHolder;
+    private String sensorId;
+    private String ubicacion;
+
 
     /** @brief Lista que almacena las últimas 6 alertas de mediciones para mostrar en la UI. */
     private final List<String> ultimasSeisAlertas = new ArrayList<>();
@@ -30,6 +33,12 @@ public class IncidenciasActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.incidencias);
 
+        Intent intent = getIntent();
+        if (intent != null) {
+            sensorId = intent.getStringExtra("SENSOR_NAME");
+            ubicacion = intent.getStringExtra("UBICACION"); // Recibimos la ubicación
+        }
+
         ultimasAlertasTextView = findViewById(R.id.textView_ultimasAlertas);
         incidenciasEnviadasTextView = findViewById(R.id.textView_incidenciasEnviadas);
         backArrow = findViewById(R.id.img_back_arrow);
@@ -40,8 +49,10 @@ public class IncidenciasActivity extends AppCompatActivity {
         backArrow.setOnClickListener(v -> finish());
 
         reportarIncidenciaButton.setOnClickListener(v -> {
-            Intent intent = new Intent(IncidenciasActivity.this, EnvioIncidenciasActivity.class);
-            startActivity(intent);
+            Intent newintent = new Intent(IncidenciasActivity.this, EnvioIncidenciasActivity.class);
+            newintent.putExtra("SENSOR_NAME", sensorId);
+            newintent.putExtra("UBICACION", ubicacion);
+            startActivity(newintent);
         });
 
         setupObservers();
