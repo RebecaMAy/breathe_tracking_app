@@ -47,6 +47,7 @@ import java.util.Locale;
  * @author Sandra (Creación clase y dataholder - 21/12)
  * @author Rocio (Filtrado de incidencias segun el sensor_id, si esta por resolver y por orden cronologico - 28/12)
  * @author Rocio (Cuando la incidencia esté resuleta se borra del historial - 28/12)
+ * @author Rocio (Cuando se resuelve la incidencia se envia un correo al adminsitrador - 28/12)
  */
 
 public class IncidenciasActivity extends AppCompatActivity {
@@ -124,68 +125,10 @@ public class IncidenciasActivity extends AppCompatActivity {
      * @brief Conecta con Firestore para escuchar cambios en tiempo real.
      * @details Filtra por:
      * 1. sensor_id actual.
-     * 2. resuelta == false (Solo muestra las pendientes).
-     * Si una incidencia pasa a 'resuelta=true', desaparece sola de la lista.
+     * 2. fecha descendiente.
+     * Si una incidencia pasa a 'resuelta=true', desaparece sola de la lista y
+     * se envia un correo al administrador.
      */
-/*
-    private void setupFirestoreRealtimeListener() {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
-
-        // CONSULTA:
-        // 1. Colección incidencias
-        // 2. Que pertenezcan a este sensor (o quita esta línea si quieres ver todas las del usuario)
-        // 3. Que NO estén resueltas
-        // 4. Ordenadas por fecha (más reciente primero)
-        Query query = db.collection("incidencias")
-                .whereEqualTo("sensor_id", sensorId)
-                .whereEqualTo("resuelta", false)
-                .orderBy("fecha", Query.Direction.DESCENDING)
-                .limit(4); // Solo traemos las últimas para no llenar la pantalla
-
-        firestoreListener = query.addSnapshotListener((snapshots, e) -> {
-            if (e != null) {
-                // Manejo de error (puede pasar si falta el índice en Firebase)
-                incidenciasEnviadasTextView.setText("Error cargando incidencias.");
-                return;
-            }
-
-            if (snapshots != null && !snapshots.isEmpty()) {
-                // 1. Detectar si alguna incidencia ha sido MODIFICADA para marcarse como resuelta
-                for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                    if (dc.getType() == DocumentChange.Type.MODIFIED) {
-                        boolean resueltaAhora = dc.getDocument().getBoolean("resuelta");
-                        // Si antes estaba pendiente y ahora el admin la marcó como true en Firebase
-                        if (resueltaAhora) {
-                            String titulo = dc.getDocument().getString("titulo");
-                            enviarCorreoResolucion(titulo);
-                        }
-                    }
-                }
-
-                // 2. Actualizar la interfaz solo con las que siguen pendientes (resuelta == false)
-                List<String> listaFormateada = new ArrayList<>();
-                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
-
-                for (QueryDocumentSnapshot doc : snapshots) {
-                    Boolean isResuelta = doc.getBoolean("resuelta");
-                    // Solo añadimos a la lista visual las que no están resueltas
-                    if (isResuelta != null && !isResuelta) {
-                        String titulo = doc.getString("titulo");
-                        Timestamp fechaTimestamp = doc.getTimestamp("fecha");
-
-                        String fechaStr = (fechaTimestamp != null) ? sdf.format(fechaTimestamp.toDate()) : "--/--";
-                        listaFormateada.add(fechaStr + " - " + titulo);
-                    }
-                }
-
-                // Actualizamos el TextView
-                incidenciasEnviadasTextView.setText(TextUtils.join("\n\n", listaFormateada));
-            } else {
-                incidenciasEnviadasTextView.setText("No hay incidencias pendientes.");
-            }
-        });
-    }*/
-
     private void setupFirestoreRealtimeListener() {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
 
@@ -249,7 +192,7 @@ public class IncidenciasActivity extends AppCompatActivity {
      * @brief Envía el correo avisando que la incidencia se ha cerrado.
      */
     private void enviarCorreoResolucion(String tituloIncidencia) {
-        String emailDestino = "a mi sandralovesel@gmail.com";
+        String emailDestino = "sandralovesel@gmail.com";
         String asunto = "Incidencia Resuelta: " + tituloIncidencia;
         String mensaje = "La incidencia con el título '" + tituloIncidencia + "' ha sido marcada como RESUELTA por el equipo técnico.";
 
