@@ -13,9 +13,12 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
@@ -39,6 +42,10 @@ import java.util.Locale;
  *
  * Utiliza un algoritmo de filtrado mediante `LinkedHashSet` para garantizar que el usuario vea siempre
  * las alertas más recientes y únicas, evitando la saturación de información en la pantalla.
+ *
+ * @author Sandra (Creación clase y dataholder - 21/12)
+ * @author Rocio (Filtrado de incidencias segun el sensor_id, si esta por resolver y por orden cronologico - 28/12)
+ * @author Rocio (Cuando la incidencia esté resuleta se borra del historial - 28/12)
  */
 
 public class IncidenciasActivity extends AppCompatActivity {
@@ -142,21 +149,32 @@ public class IncidenciasActivity extends AppCompatActivity {
             }
 
             if (snapshots != null && !snapshots.isEmpty()) {
+                // 1. Detectar si alguna incidencia ha sido MODIFICADA para marcarse como resuelta
+                for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                    if (dc.getType() == DocumentChange.Type.MODIFIED) {
+                        boolean resueltaAhora = dc.getDocument().getBoolean("resuelta");
+                        // Si antes estaba pendiente y ahora el admin la marcó como true en Firebase
+                        if (resueltaAhora) {
+                            String titulo = dc.getDocument().getString("titulo");
+                            enviarCorreoResolucion(titulo);
+                        }
+                    }
+                }
+
+                // 2. Actualizar la interfaz solo con las que siguen pendientes (resuelta == false)
                 List<String> listaFormateada = new ArrayList<>();
                 SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
 
                 for (QueryDocumentSnapshot doc : snapshots) {
-                    String titulo = doc.getString("titulo");
-                    // Obtenemos el timestamp de Firebase
-                    Timestamp fechaTimestamp = doc.getTimestamp("fecha");
+                    Boolean isResuelta = doc.getBoolean("resuelta");
+                    // Solo añadimos a la lista visual las que no están resueltas
+                    if (isResuelta != null && !isResuelta) {
+                        String titulo = doc.getString("titulo");
+                        Timestamp fechaTimestamp = doc.getTimestamp("fecha");
 
-                    String fechaStr = "";
-                    if (fechaTimestamp != null) {
-                        fechaStr = sdf.format(fechaTimestamp.toDate());
+                        String fechaStr = (fechaTimestamp != null) ? sdf.format(fechaTimestamp.toDate()) : "--/--";
+                        listaFormateada.add(fechaStr + " - " + titulo);
                     }
-
-                    // Formato: "12/05 14:30 - Sensor Caído"
-                    listaFormateada.add(fechaStr + " - " + titulo);
                 }
 
                 // Actualizamos el TextView
@@ -165,6 +183,20 @@ public class IncidenciasActivity extends AppCompatActivity {
                 incidenciasEnviadasTextView.setText("No hay incidencias pendientes.");
             }
         });
+    }
+
+    /**
+     * @brief Envía el correo avisando que la incidencia se ha cerrado.
+     */
+    private void enviarCorreoResolucion(String tituloIncidencia) {
+        String emailDestino = "sandralovesel@gmail.com";
+        String asunto = "Incidencia Resuelta: " + tituloIncidencia;
+        String mensaje = "La incidencia con el título '" + tituloIncidencia + "' ha sido marcada como RESUELTA por el equipo técnico.";
+
+        JavaMailAPI mailSender = new JavaMailAPI(this, emailDestino, asunto, mensaje);
+        mailSender.execute();
+
+        Toast.makeText(this, "Notificación de resolución enviada", Toast.LENGTH_SHORT).show();
     }
 
     private void setupObserversLocales() {
