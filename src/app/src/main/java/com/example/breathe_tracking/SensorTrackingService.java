@@ -1,7 +1,8 @@
 /**
  * @file SensorTrackingService.java
- * @brief Implementa el servicio principal en segundo plano (Foreground Service) para el seguimiento del sensor.
+ * @brief Implementa el servicio en primer plano para la gestión del ciclo de vida del rastreo del sensor.
  * @package com.example.breathe_tracking
+ * @copyright Copyright © 2025
  */
 package com.example.breathe_tracking;
 
@@ -57,20 +58,27 @@ import java.util.Map;
 
 /**
  * @class SensorTrackingService
- * @brief Servicio de Android que se ejecuta en primer plano para monitorizar un sensor BLE ("rocio").
- *
- * Copyrigth © 2025
- *
- * Este servicio centraliza las funcionalidades clave de la aplicación:
- * 1.  **Escaneo Bluetooth (BLE):** Búsqueda y recepción constante de la trama de datos del sensor. (22/10-Rocio)
- * 2.  **Decodificación de Trama:** Extracción de mediciones (O3, Temperatura, CO2, Batería) del payload del beacon.(29/10-Rocio)
- * 3.  **Seguimiento de Ubicación:** Obtención de coordenadas GPS y conversión a dirección legible.(27/10-Sandra)
- * 4.  **Publicación de Datos (LiveData):** Actualización del estado global de la aplicación a través de \ref TrackingDataHolder.(29/10-Sandra)
- * 5.  **Lógica de Alertas:** Envío de notificaciones de alta prioridad basadas en umbrales de medición (ej. CO2 > 1200).(04/11-Sandra)
- * 6.  **Vigilante de Conexión (Watchdog):** Mecanismo de temporizador para detectar la pérdida de conexión con el sensor.(06/11-Sandra)
- * 7.  **Subida de datos:** Sincronización de mediciones e historial con **Firebase Firestore**.(17/11-Sandra)
- *
+ * @brief Servicio en primer plano (Foreground Service) que actúa como el núcleo de procesamiento de datos.
  * @extends Service
+ *
+ * @details
+ * Este servicio se ejecuta independientemente de la UI para garantizar la recolección continua de datos.
+ *
+ *
+ *
+ * **Responsabilidades:**
+ * 1.  **Orquestación BLE:** Escanea dispositivos "rocio", filtra por RSSI y decodifica la trama de bytes (byte shifting).
+ * 2.  **Contexto Geoespacial:** Enriquece los datos con coordenadas GPS y geocoding inverso.
+ * 3.  **Motor de Alertas:**
+ * - CO2 > 1200 ppm.
+ * - Ozono > 0.9 ppm.
+ * - Temperatura > 35ºC.
+ * - Batería < 15%.
+ * 4.  **Persistencia:** Sincronización en tiempo real con Firebase Firestore (Historial + Estado Actual).
+ * 5.  **Watchdog (Perro Guardián):** Temporizador que detecta desconexiones si no llegan paquetes en 3 minutos.
+ *
+ * @author Rocio (Lógica BLE, Decodificación - 22/10, 29/10)
+ * @author Sandra (Ubicación, LiveData, Alertas, Watchdog, Firebase - 27/10, 29/10, 04/11, 06/11, 17/11)
  */
 
 public class SensorTrackingService extends Service {
@@ -150,7 +158,12 @@ public class SensorTrackingService extends Service {
 
     // --- onCreate --------------------------------------------------------------------------------------
     /**
-     * @brief Se llama al crear el servicio. Inicializa clientes, canales de notificación y callbacks.
+     * @brief Inicialización del servicio.
+     * Configura:
+     * - Cliente de ubicación y su callback.
+     * - Canales de notificación.
+     * - Referencia a la base de datos.
+     * - Lógica del Watchdog (Runnable) para manejar desconexiones.
      */
     @Override
     public void onCreate() {
@@ -496,6 +509,7 @@ public class SensorTrackingService extends Service {
 
     /**
      * @brief Añade una nueva alerta a la lista, gestionando el tamaño máximo.
+     * (alertMessage:String) -> addAlert() -> (V/F:boolean)
      * @param alertMessage Mensaje de la alerta.
      * @return true si la alerta es nueva y se ha añadido; false en caso contrario.
      */

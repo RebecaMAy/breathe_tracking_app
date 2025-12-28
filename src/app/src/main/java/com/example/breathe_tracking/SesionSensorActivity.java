@@ -1,7 +1,8 @@
 /**
  * @file SesionSensorActivity.java
- * @brief Actividad principal que muestra en tiempo real los datos recibidos del sensor y el estado del servicio de rastreo.
+ * @brief Actividad principal de monitorización en tiempo real.
  * @package com.example.breathe_tracking
+ * @copyright Copyright © 2025
  */
 package com.example.breathe_tracking;
 
@@ -34,52 +35,94 @@ import com.google.firebase.firestore.ListenerRegistration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
 /**
  * @class SesionSensorActivity
- * @brief Clase que representa la actividad de la sesión del sensor.
- *
- * Copyright © 2025
- *
- * Se encarga de:
- * - Mostrar datos en tiempo real (CO2, Ozono, Temp, Batería, Ubicación) obtenidos del \ref SensorTrackingService.
- * - Utilizar \ref TrackingDataHolder (LiveData) para observar los cambios en las mediciones.
- * - Gestionar la solicitud de permisos (Ubicación, Bluetooth, Notificaciones).
- * - Iniciar y detener el \ref SensorTrackingService.
- * - Ofrecer la funcionalidad para reportar incidencias.
- *
+ * @brief Dashboard principal que visualiza los datos del sensor y gestiona el estado de la conexión.
  * @extends AppCompatActivity
+ *
+ * @details
+ * Esta actividad actúa como la vista principal (View) en la arquitectura de la aplicación.
+ * Se suscribe a los cambios de datos emitidos por @ref TrackingDataHolder (ViewModel/Repository)
+ * para actualizar la interfaz de usuario en tiempo real sin bloquear el hilo principal.
+ *
+ *
+ *
+ * **Funcionalidades Clave:**
+ * 1. **Monitorización en Tiempo Real:** Visualización de O3, CO2, Temperatura y Batería.
+ * 2. **Feedback Visual Semántico:**
+ * - Barras de progreso con código de colores (Verde/Naranja/Rojo) según umbrales de peligro.
+ * 3. **Gestión de Ciclo de Vida del Servicio:** Inicia el @ref SensorTrackingService garantizando los permisos necesarios.
+ * 4. **Gestión de Incidencias:**
+ * - Bloqueo de UI mediante Overlay cuando hay desconexión.
+ * - Escucha activa en Firestore para desbloquear la UI automáticamente si la incidencia se resuelve remotamente.
+ *
+ * @author Sandra (UI, Lógica de visualización y alertas - 11/11/2025)
+ * @author Rocio (Conexión con base de datos y lógica de servicio - 19/11/2025)
+ * @see SensorTrackingService
+ * @see TrackingDataHolder
  */
 public class SesionSensorActivity extends AppCompatActivity {
 
-    // --- Vistas de la UI ---
+    // --- Elementos de la UI ---
+    /** @brief Muestra la dirección o coordenadas actuales del dispositivo. */
     private TextView ubicacionTextView;
+    /** @brief Muestra la hora del último paquete de datos recibido. */
     private TextView ultimaConexionTextView;
+    /** @brief Muestra el porcentaje de batería del sensor. */
     private TextView bateriaTextView;
+    /** @brief Muestra el valor numérico de Ozono. */
     private TextView ozonoTextView;
+    /** @brief Muestra el valor numérico de Temperatura. */
     private TextView temperaturaTextView;
+    /** @brief Muestra el valor numérico de CO2. */
     private TextView co2TextView;
+    /** @brief Muestra mensajes de texto si se superan los límites de seguridad. */
+    private TextView alertaTextView;
+    /** @brief Muestra el estado de incidencias o desconexión. */
+    private TextView incidenciaTextView;
+    /** @brief Muestra "Conectado" (Verde) o "Desconectado" (Rojo). */
     private TextView estadoTextView;
+    /** @brief Botón para navegar a la actividad de reporte. */
+    private TextView reportarIncidenciaTextView;
+    /** @brief Muestra el ID del sensor vinculado. */
     private TextView nombreSensorTextView;
+    /** @brief Enlace a la actividad de gráficas históricas. */
     private TextView verGraficasTextView;
+    /** @brief Icono dinámico para la intensidad de señal (RSSI). */
     private ImageView imgSignal;
-    private TextView manualUsuarioTextView;
-    private ImageView notificacionesButton;
+
+    // --- Barras de Progreso ---
+    /** @brief Indicador visual para CO2. */
     private ProgressBar co2ProgressBar;
+    /** @brief Indicador visual para Ozono. */
     private ProgressBar ozonoProgressBar;
+    /** @brief Indicador visual para Temperatura. */
     private ProgressBar temperaturaProgressBar;
+    /**@brief Enlace a la actividad de manual de usuario. */
+    private TextView manualUsuarioTextView;
+    /**@ brief Enlace a la actividad de notificaciones. */
+    private ImageView notificacionesButton;
+    /** @brief Overlay para reportar incidencias. */
     private ConstraintLayout layoutOverlayDesconexion;
+    /** @brief Botón para reportar incidencias. */
     private Button btnReportarOverlay;
 
-    // --- Lógica de Datos y Backend ---
+    // --- Lógica de Datos y backend ---
+    /** @brief Instancia Singleton que contiene los LiveData observables. */
     private TrackingDataHolder dataHolder;
+    /** @brief Identificador único del sensor recibido por Intent. */
     private String sensorId;
+    /** @brief Instancia de Firestore para operaciones con la base de datos. */
     private FirebaseFirestore db;
+    /** @brief Listener para la resolución de incidencias. */
     private ListenerRegistration incidenciaListener;
 
+
+
     /**
-     * @brief Lanzador para el resultado de la actividad de reporte de incidencias.
-     *        Gestiona la UI cuando una incidencia es reportada con éxito.
+     * @brief Gestiona el retorno de la actividad de reporte de incidencias.
+     * Si el reporte es exitoso, actualiza el botón del overlay para evitar duplicados
+     * y activa la escucha de resolución en Firestore.
      */
     private final ActivityResultLauncher<Intent> reportarIncidenciaLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -95,9 +138,8 @@ public class SesionSensorActivity extends AppCompatActivity {
     );
 
     /**
-     * @brief Launcher para la solicitud de múltiples permisos.
-     *        Verifica que TODOS los permisos necesarios (Ubicación, Bluetooth y Notificaciones) son concedidos
-     *        antes de iniciar el servicio de rastreo para evitar cierres inesperados.
+     * @brief Gestiona la solicitud de permisos en tiempo de ejecución.
+     * Verifica permisos críticos (Ubicación, Bluetooth y Notificaciones) antes de arrancar el servicio.
      */
     private final ActivityResultLauncher<String[]> requestPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
@@ -110,6 +152,11 @@ public class SesionSensorActivity extends AppCompatActivity {
                 }
             });
 
+    /**
+     * @brief Método de inicialización del ciclo de vida.
+     * Configura la inyección de dependencias, inicializa vistas y observadores.
+     * @param savedInstanceState Estado guardado de la aplicación.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -133,7 +180,8 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Vincula las variables de la clase con sus vistas correspondientes en el layout XML.
+     * @brief Vincula los objetos Java con los elementos del XML.
+     * Aplica estilos programáticos (como el subrayado de enlaces).
      */
     private void initializeViews() {
         ubicacionTextView = findViewById(R.id.textView_ubicacion);
@@ -160,7 +208,8 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Configura los listeners para los elementos interactivos de la UI.
+     * @brief Configura los Listeners para la interacción del usuario.
+     * Define la navegación a otras actividades (Gráficas, Incidencias, Manual, Login).
      */
     private void setupListeners() {
         ImageView cerrarSesionButton = findViewById(R.id.imageView_cerrarSesion);
@@ -198,7 +247,13 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Inicializa los observadores de LiveData para actualizar la UI en tiempo real.
+     * @brief Configura el patrón Observer sobre los LiveData del DataHolder.
+     *
+     * @details
+     * Define la lógica de presentación:
+     * - **Colores:** Asigna drawables (Verde/Naranja/Rojo) a las barras de progreso.
+     * - **Visibilidad:** Muestra/Oculta el overlay de desconexión según el estado.
+     * - **Iconografía:** Cambia el icono de señal según el RSSI.
      */
     private void setupObservers() {
         dataHolder.locationData.observe(this, address -> {
@@ -269,8 +324,9 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Inicia una escucha en Firestore para la resolución de una incidencia.
-     *        Cuando el campo 'resuelta' es true, oculta el overlay y restaura el botón.
+     * @brief Inicia una escucha activa en Firestore.
+     * Si la incidencia activa (vinculada al ID del sensor) marca `resuelta: true`,
+     * la aplicación desbloquea automáticamente la interfaz del usuario.
      */
     private void listenForIncidenciaResolution() {
         if (sensorId == null || sensorId.isEmpty()) return;
@@ -292,8 +348,10 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Verifica si los permisos necesarios están concedidos e inicia el servicio. Si no, los solicita.
-     *        Incluye el permiso de notificaciones para Android 13+.
+     * @brief Verifica permisos e inicia el servicio.
+     *
+     * @note Gestiona explícitamente `POST_NOTIFICATIONS` para Android 13+ (API 33).
+     * Si faltan permisos, los solicita en bloque. Si se tienen, arranca el servicio.
      */
     private void checkPermissionsAndStartService() {
         List<String> requiredPermissions = new ArrayList<>();
@@ -321,7 +379,7 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Inicia el servicio de rastreo en primer plano.
+     * @brief Arranca el @ref SensorTrackingService como Foreground Service.
      */
     private void startTrackingService() {
         Intent serviceIntent = new Intent(this, SensorTrackingService.class);
@@ -332,13 +390,17 @@ public class SesionSensorActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Detiene el servicio de rastreo.
+     * @brief Detiene el servicio de rastreo al cerrar sesión.
      */
     private void stopTrackingService() {
         Intent serviceIntent = new Intent(this, SensorTrackingService.class);
         stopService(serviceIntent);
     }
 
+    /**
+     * @brief Limpieza de recursos al destruir la actividad.
+     * Elimina el listener de Firestore para evitar fugas de memoria.
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();

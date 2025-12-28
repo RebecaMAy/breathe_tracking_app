@@ -1,3 +1,10 @@
+/**
+ * @file ManualUsuarioActivity.java
+ * @brief Actividad que muestra la documentación de ayuda y preguntas frecuentes.
+ * @package com.example.breathe_tracking
+ * @copyright Copyright © 2025
+ */
+
 package com.example.breathe_tracking;
 
 import android.os.Bundle;
@@ -8,9 +15,41 @@ import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * @class ManualUsuarioActivity
- * @brief Actividad que muestra el Manual de Usuario y FAQ con diseño de acordeón multinivel.
+ * @brief Actividad de ayuda que presenta el Manual de Usuario y FAQ mediante un diseño de acordeón.
+ * @extends AppCompatActivity
+ *
+ * @details
+ * Esta actividad proporciona soporte al usuario explicando el funcionamiento de la aplicación.
+ * Para mejorar la usabilidad y no saturar la pantalla con texto, implementa un patrón de UI tipo **Acordeón** (Expandable List).
+ *
+ *
+ *
+ * **Funcionamiento:**
+ * - La información está dividida en 7 categorías temáticas.
+ * - Al pulsar sobre una cabecera, el contenido asociado se expande o contrae.
+ * - Incluye animaciones visuales (rotación de flechas) para indicar el estado de cada sección.
+ *
+ * @author Sandra (Diseño UI y Lógica de acordeón)
+ * @date 20/12/2025
  */
+
 public class ManualUsuarioActivity extends AppCompatActivity {
+
+    /**
+     * @brief Inicializa la actividad y configura las secciones del manual.
+     *
+     * Realiza el enlace (binding) de los componentes de la interfaz para las 7 secciones:
+     * 1. Inicio de Sesión.
+     * 2. Panel y Estado.
+     * 3. Contaminantes.
+     * 4. Gráficas.
+     * 5. Alertas.
+     * 6. Incidencias.
+     * 7. Preguntas Frecuentes (FAQ).
+     *
+     * (savedInstanceState:Bundle) -> onCreate() -> ()
+     * @param savedInstanceState Estado guardado de la aplicación.
+     */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,7 +77,16 @@ public class ManualUsuarioActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Configura el listener de clic para expandir/colapsar una sección.
+     * @brief Método auxiliar para configurar la lógica de expansión/colapso de una sección.
+     *
+     * Asigna un `OnClickListener` al layout de cabecera que:
+     * 1. Alterna la visibilidad del layout de contenido (`View.VISIBLE` <-> `View.GONE`).
+     * 2. Anima la rotación de la flecha indicadora (0° -> 180°) para dar feedback visual.
+     * (headerId:int, contentId:int, arrowId:int) -> setupAccordion() -> ()
+     *
+     * @param headerId ID del recurso (LinearLayout) que actúa como cabecera/botón.
+     * @param contentId ID del recurso (LinearLayout) que contiene la información a mostrar/ocultar.
+     * @param arrowId ID del recurso (ImageView) del icono de la flecha.
      */
     private void setupAccordion(int headerId, int contentId, int arrowId) {
         LinearLayout header = findViewById(headerId);
