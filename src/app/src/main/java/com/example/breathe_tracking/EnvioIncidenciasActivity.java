@@ -145,6 +145,8 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
 
         // Ejecutar envío de correo
         new JavaMailAPI(this, "sandralovesel@gmail.com", titulo, mensaje).execute();
+        //new JavaMailAPI(this, "ropibava@gmail.com", titulo, mensaje).execute();
+
 
         // Ejecutar guardado en Firebase
         enviarIncidenciaAFirebase(titulo, mensaje);

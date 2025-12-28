@@ -10,6 +10,7 @@ package com.example.breathe_tracking;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -126,7 +127,7 @@ public class IncidenciasActivity extends AppCompatActivity {
      * 2. resuelta == false (Solo muestra las pendientes).
      * Si una incidencia pasa a 'resuelta=true', desaparece sola de la lista.
      */
-
+/*
     private void setupFirestoreRealtimeListener() {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
 
@@ -183,13 +184,72 @@ public class IncidenciasActivity extends AppCompatActivity {
                 incidenciasEnviadasTextView.setText("No hay incidencias pendientes.");
             }
         });
+    }*/
+
+    private void setupFirestoreRealtimeListener() {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        // 1. Subimos el límite para asegurarnos de captar las pendientes
+        // y las que se acaban de resolver.
+        Query query = db.collection("incidencias")
+                .whereEqualTo("sensor_id", sensorId)
+                .orderBy("fecha", Query.Direction.DESCENDING)
+                .limit(30); // Aumentamos para no "perder" las pendientes entre las resueltas
+
+        firestoreListener = query.addSnapshotListener((snapshots, e) -> {
+            if (e != null) {
+                Log.e("FirestoreError", e.getMessage());
+                incidenciasEnviadasTextView.setText("Error cargando incidencias.");
+                return;
+            }
+
+            if (snapshots != null) {
+                // DETECCIÓN DE CAMBIOS PARA CORREO
+                for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                    if (dc.getType() == DocumentChange.Type.MODIFIED) {
+                        Boolean resueltaAhora = dc.getDocument().getBoolean("resuelta");
+                        if (resueltaAhora != null && resueltaAhora) {
+                            String titulo = dc.getDocument().getString("titulo");
+                            enviarCorreoResolucion(titulo);
+                        }
+                    }
+                }
+
+                // RENDERIZADO DE LA LISTA
+                List<String> listaFormateada = new ArrayList<>();
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+                int contadorUI = 0;
+
+                for (QueryDocumentSnapshot doc : snapshots) {
+                    Boolean isResuelta = doc.getBoolean("resuelta");
+
+                    // Solo añadimos si NO está resuelta
+                    if (isResuelta != null && !isResuelta) {
+                        // Controlamos el límite de 4 AQUÍ, en la interfaz
+                        if (contadorUI < 4) {
+                            String titulo = doc.getString("titulo");
+                            Timestamp ts = doc.getTimestamp("fecha");
+                            String fechaStr = (ts != null) ? sdf.format(ts.toDate()) : "--/--";
+                            listaFormateada.add(fechaStr + " - " + titulo);
+                            contadorUI++;
+                        }
+                    }
+                }
+
+                if (listaFormateada.isEmpty()) {
+                    incidenciasEnviadasTextView.setText("No hay incidencias pendientes.");
+                } else {
+                    incidenciasEnviadasTextView.setText(TextUtils.join("\n\n", listaFormateada));
+                }
+            }
+        });
     }
 
     /**
      * @brief Envía el correo avisando que la incidencia se ha cerrado.
      */
     private void enviarCorreoResolucion(String tituloIncidencia) {
-        String emailDestino = "sandralovesel@gmail.com";
+        String emailDestino = "a mi sandralovesel@gmail.com";
         String asunto = "Incidencia Resuelta: " + tituloIncidencia;
         String mensaje = "La incidencia con el título '" + tituloIncidencia + "' ha sido marcada como RESUELTA por el equipo técnico.";
 
