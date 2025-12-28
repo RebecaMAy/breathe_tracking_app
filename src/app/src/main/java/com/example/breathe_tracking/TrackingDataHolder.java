@@ -1,7 +1,8 @@
 /**
  * @file TrackingDataHolder.java
- * @brief Implementa un Singleton para actuar como repositorio central de datos en tiempo real mediante LiveData.
+ * @brief Repositorio central de datos en tiempo real implementado como Singleton.
  * @package com.example.breathe_tracking
+ * @copyright Copyright © 2025
  */
 package com.example.breathe_tracking;
 
@@ -12,15 +13,21 @@ import java.util.List;
 
 /**
  * @class TrackingDataHolder
- * @brief "Tablón de Anuncios" de la aplicación implementado como patrón Singleton.
+ * @brief "Tablón de Anuncios" reactivo de la aplicación (Singleton + LiveData).
  *
- * Copyrigth © 2025
+ * @details
+ * Esta clase implementa un almacén de datos centralizado que desacopla el productor de datos
+ * (@ref SensorTrackingService) del consumidor (@ref SesionSensorActivity).
  *
- * Su función principal es servir de puente seguro y reactivo para la comunicación de datos
- * entre el servicio de fondo (\ref SensorTrackingService) y la interfaz de usuario (\ref SesionSensorActivity).
+ * **Arquitectura:**
+ * Actúa como un bus de eventos en tiempo real. Al usar `MutableLiveData`, garantiza que:
+ * 1. La UI siempre observe el último dato disponible.
+ * 2. No se produzcan fugas de memoria (Memory Leaks) si la actividad se destruye.
+ * 3. La actualización de la interfaz sea segura respecto a los hilos (Thread-safe) usando `.postValue()`.
  *
- * Utiliza \ref MutableLiveData para que la Activity pueda observar automáticamente los cambios
- * en los datos del sensor y actualizar la UI de manera eficiente y segura (thread-safe).
+ *
+ *
+ * @author Sandra (Arquitectura LiveData - 29/10/2025)
  */
 public class TrackingDataHolder {
     /** @brief Instancia única y estática de la clase (Singleton). */
@@ -57,13 +64,14 @@ public class TrackingDataHolder {
     public final MutableLiveData<List<String>> incidenciasEnviadasData = new MutableLiveData<>(new ArrayList<>());
 
     /**
-     * @brief Constructor privado para forzar el patrón Singleton.
+     * @brief Constructor privado.
+     * Evita la instanciación directa para cumplir con el patrón Singleton.
      */
     private TrackingDataHolder() {}
 
     /**
-     * @brief Proporciona la única instancia accesible de la clase.
-     * @return La instancia Singleton de TrackingDataHolder.
+     * @brief Obtiene la instancia única del repositorio de datos.
+     * @return La instancia estática de TrackingDataHolder.
      */
     public static TrackingDataHolder getInstance() {
         return instance;

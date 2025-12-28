@@ -1,3 +1,10 @@
+/**
+ * @file IncidenciasActivity.java
+ * @brief Actividad para la visualización del historial de notificaciones y gestión de incidencias.
+ * @package com.example.breathe_tracking
+ * @copyright Copyright © 2025
+ */
+
 package com.example.breathe_tracking;
 
 import android.content.Intent;
@@ -11,6 +18,20 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+
+/**
+ * @class IncidenciasActivity
+ * @brief Centro de notificaciones de la aplicación.
+ * @extends AppCompatActivity
+ *
+ * @details
+ * Esta actividad cumple dos funciones principales:
+ * 1. **Historial de Alertas:** Muestra una lista filtrada de las últimas mediciones peligrosas detectadas por el sensor.
+ * 2. **Gestión de Incidencias:** Muestra el estado de los reportes enviados y permite la navegación para reportar nuevas incidencias manualmente.
+ *
+ * Utiliza un algoritmo de filtrado mediante `LinkedHashSet` para garantizar que el usuario vea siempre
+ * las alertas más recientes y únicas, evitando la saturación de información en la pantalla.
+ */
 
 public class IncidenciasActivity extends AppCompatActivity {
 
@@ -27,6 +48,13 @@ public class IncidenciasActivity extends AppCompatActivity {
     private final List<String> ultimasSeisAlertas = new ArrayList<>();
     /** @brief Constante que define el número máximo de alertas a mostrar en la UI. */
     private static final int MAX_ALERTS_IN_UI = 6;
+
+    /**
+     * @brief Inicialización de la actividad.
+     * Recupera el contexto (Sensor y Ubicación) del Intent y configura la navegación.
+     * (savedInstanceState:Bundle) -> onCreate() -> ()
+     * @param savedInstanceState Estado guardado.
+     */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,8 +88,13 @@ public class IncidenciasActivity extends AppCompatActivity {
 
     /**
      * @brief Configura los observadores de datos para actualizar la UI en tiempo real.
-     *        La lógica de alertas utiliza un Set para garantizar que no se muestren alertas duplicadas
-     *        y mantiene la lista de la UI con un máximo de 6 alertas únicas.
+     *
+     * @details
+     * **Algoritmo de Gestión de Alertas:**
+     * Se implementa una lógica de "Cola de Prioridad Única" utilizando `LinkedHashSet`:
+     * 1. **Prioridad:** Las `newAlerts` (que llegan del servicio) se insertan primero.
+     * 2. **Unicidad:** Si una alerta antigua es idéntica a una nueva, el `Set` elimina la duplicada manteniendo la más reciente.
+     * 3. **Limpieza:** Se recorta la lista resultante para no exceder `MAX_ALERTS_IN_UI`.
      */
     private void setupObservers() {
         dataHolder.alertData.observe(this, newAlerts -> {
@@ -101,7 +134,8 @@ public class IncidenciasActivity extends AppCompatActivity {
     }
 
     /**
-     * @brief Actualiza el TextView de alertas con el contenido de la lista.
+     * @brief Renderiza la lista de alertas en el TextView.
+     * Utiliza `TextUtils.join` para separar cada alerta con un doble salto de línea.
      */
     private void actualizarTextoAlertas() {
         if (ultimasSeisAlertas.isEmpty()) {
