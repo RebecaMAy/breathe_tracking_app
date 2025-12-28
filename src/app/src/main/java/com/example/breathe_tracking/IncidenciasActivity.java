@@ -15,9 +15,17 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * @class IncidenciasActivity
@@ -43,6 +51,7 @@ public class IncidenciasActivity extends AppCompatActivity {
     private String sensorId;
     private String ubicacion;
 
+    private ListenerRegistration firestoreListener;
 
     /** @brief Lista que almacena las últimas 6 alertas de mediciones para mostrar en la UI. */
     private final List<String> ultimasSeisAlertas = new ArrayList<>();
@@ -78,60 +87,111 @@ public class IncidenciasActivity extends AppCompatActivity {
 
         reportarIncidenciaButton.setOnClickListener(v -> {
             Intent newintent = new Intent(IncidenciasActivity.this, EnvioIncidenciasActivity.class);
-            newintent.putExtra("SENSOR_NAME", sensorId);
+            newintent.putExtra("SENSOR_ID", sensorId);
             newintent.putExtra("UBICACION", ubicacion);
             startActivity(newintent);
         });
 
-        setupObservers();
+        setupObserversLocales();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Iniciamos la escucha cuando la pantalla se hace visible
+        setupFirestoreRealtimeListener();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Detenemos la escucha cuando la pantalla ya no se ve para ahorrar datos y batería
+        if (firestoreListener != null) {
+            firestoreListener.remove();
+            firestoreListener = null;
+        }
     }
 
     /**
-     * @brief Configura los observadores de datos para actualizar la UI en tiempo real.
-     *
-     * @details
-     * **Algoritmo de Gestión de Alertas:**
-     * Se implementa una lógica de "Cola de Prioridad Única" utilizando `LinkedHashSet`:
-     * 1. **Prioridad:** Las `newAlerts` (que llegan del servicio) se insertan primero.
-     * 2. **Unicidad:** Si una alerta antigua es idéntica a una nueva, el `Set` elimina la duplicada manteniendo la más reciente.
-     * 3. **Limpieza:** Se recorta la lista resultante para no exceder `MAX_ALERTS_IN_UI`.
+     * @brief Conecta con Firestore para escuchar cambios en tiempo real.
+     * @details Filtra por:
+     * 1. sensor_id actual.
+     * 2. resuelta == false (Solo muestra las pendientes).
+     * Si una incidencia pasa a 'resuelta=true', desaparece sola de la lista.
      */
-    private void setupObservers() {
+
+    private void setupFirestoreRealtimeListener() {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        // CONSULTA:
+        // 1. Colección incidencias
+        // 2. Que pertenezcan a este sensor (o quita esta línea si quieres ver todas las del usuario)
+        // 3. Que NO estén resueltas
+        // 4. Ordenadas por fecha (más reciente primero)
+        Query query = db.collection("incidencias")
+                .whereEqualTo("sensor_id", sensorId)
+                .whereEqualTo("resuelta", false)
+                .orderBy("fecha", Query.Direction.DESCENDING)
+                .limit(4); // Solo traemos las últimas para no llenar la pantalla
+
+        firestoreListener = query.addSnapshotListener((snapshots, e) -> {
+            if (e != null) {
+                // Manejo de error (puede pasar si falta el índice en Firebase)
+                incidenciasEnviadasTextView.setText("Error cargando incidencias.");
+                return;
+            }
+
+            if (snapshots != null && !snapshots.isEmpty()) {
+                List<String> listaFormateada = new ArrayList<>();
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+
+                for (QueryDocumentSnapshot doc : snapshots) {
+                    String titulo = doc.getString("titulo");
+                    // Obtenemos el timestamp de Firebase
+                    Timestamp fechaTimestamp = doc.getTimestamp("fecha");
+
+                    String fechaStr = "";
+                    if (fechaTimestamp != null) {
+                        fechaStr = sdf.format(fechaTimestamp.toDate());
+                    }
+
+                    // Formato: "12/05 14:30 - Sensor Caído"
+                    listaFormateada.add(fechaStr + " - " + titulo);
+                }
+
+                // Actualizamos el TextView
+                incidenciasEnviadasTextView.setText(TextUtils.join("\n\n", listaFormateada));
+            } else {
+                incidenciasEnviadasTextView.setText("No hay incidencias pendientes.");
+            }
+        });
+    }
+
+    private void setupObserversLocales() {
+
         dataHolder.alertData.observe(this, newAlerts -> {
             if (newAlerts != null && !newAlerts.isEmpty()) {
-
-                // Usamos un LinkedHashSet para preservar el orden y garantizar la unicidad.
-                // 1. Se añaden las alertas nuevas que llegan del servicio para darles prioridad.
+                // Usamos LinkedHashSet para evitar duplicados y mantener orden
                 LinkedHashSet<String> uniqueAlerts = new LinkedHashSet<>(newAlerts);
-                // 2. Luego, se añaden las alertas antiguas que ya teníamos. Las duplicadas serán ignoradas por el Set.
                 uniqueAlerts.addAll(ultimasSeisAlertas);
 
-                // 3. Reconstruimos la lista a partir del conjunto único de alertas.
                 ultimasSeisAlertas.clear();
                 ultimasSeisAlertas.addAll(uniqueAlerts);
 
-                // 4. --- GESTIÓN DEL LÍMITE DE 6 ALERTAS ---
-                // Si la lista ahora tiene más de 6 elementos, se eliminan los más antiguos (los del final).
+                // Limitar a 6 alertas en pantalla
                 while (ultimasSeisAlertas.size() > MAX_ALERTS_IN_UI) {
                     ultimasSeisAlertas.remove(ultimasSeisAlertas.size() - 1);
                 }
 
-                // 5. Se actualiza la interfaz gráfica con la lista limpia y ordenada.
                 actualizarTextoAlertas();
             }
         });
 
-        // Observador para el historial de incidencias enviadas
-        dataHolder.incidenciasEnviadasData.observe(this, history -> {
-            if (history != null && !history.isEmpty()) {
-                incidenciasEnviadasTextView.setText(TextUtils.join("\n\n", history));
-            } else {
-                incidenciasEnviadasTextView.setText("No hay incidencias enviadas");
-            }
-        });
-
+        // Inicializar texto si ya había alertas
         actualizarTextoAlertas();
+
     }
+
 
     /**
      * @brief Renderiza la lista de alertas en el TextView.
@@ -139,10 +199,9 @@ public class IncidenciasActivity extends AppCompatActivity {
      */
     private void actualizarTextoAlertas() {
         if (ultimasSeisAlertas.isEmpty()) {
-            ultimasAlertasTextView.setText("No hay alertas");
+            ultimasAlertasTextView.setText("No hay alertas de sensores");
         } else {
-            String textoAlertas = TextUtils.join("\n\n", ultimasSeisAlertas);
-            ultimasAlertasTextView.setText(textoAlertas);
+            ultimasAlertasTextView.setText(TextUtils.join("\n\n", ultimasSeisAlertas));
         }
     }
 }

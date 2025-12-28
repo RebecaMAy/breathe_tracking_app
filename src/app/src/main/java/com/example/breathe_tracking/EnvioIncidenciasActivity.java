@@ -101,7 +101,7 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
         sensorIdRecibido = intent.getStringExtra("SENSOR_ID");
         ubicacionRecibida = intent.getStringExtra("UBICACION");
         // Verificamos si es un aviso automático
-        if (intent.hasExtra("SENSOR_NAME")) {
+        if (intent.hasExtra("SENSOR_ID")) {
             prellenarFormularioAutomatico(intent);
         }
     }
@@ -116,7 +116,7 @@ public class EnvioIncidenciasActivity extends AppCompatActivity {
      * @param intent Intent que contiene los datos del error ("SENSOR_NAME", "ULTIMA_CONEXION").
      */
     private void prellenarFormularioAutomatico(Intent intent) {
-        String sensorName = intent.getStringExtra("SENSOR_NAME");
+        String sensorName = intent.getStringExtra("SENSOR_ID");
         String ultimaCon = intent.getStringExtra("ULTIMA_CONEXION");
 
         if (ultimaCon != null) ultimaCon = ultimaCon.replace("Última conex. ", "");
